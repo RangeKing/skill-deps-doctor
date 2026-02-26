@@ -257,38 +257,146 @@ def check_install_arrays(installs: list[tuple[Path, list[dict]]]) -> list[Findin
     return findings
 
 
-def check_playwright_probe(check_dir: Path, probe: bool) -> list[Finding]:
-    """Cross-OS best-effort Playwright detection.
+def check_python_playwright(check_dir: Path, probe: bool) -> list[Finding]:
+    """Detect Python Playwright (best-effort).
 
-    - Detect local node playwright in `node_modules/`.
-    - Optionally run `playwright --version` if available.
+    We don't create venvs. We only probe the current Python interpreter.
+    """
+    findings: list[Finding] = []
+
+    # Only relevant if this looks like a Python project
+    if not ((check_dir / "pyproject.toml").exists() or (check_dir / "requirements.txt").exists()):
+        return findings
+
+    if not probe:
+        # Don't import modules unless user asks.
+        return findings
+
+    try:
+        out = subprocess.check_output(
+            [
+                sys.executable,
+                "-c",
+                "import playwright; import importlib.metadata as m; print('python-playwright', m.version('playwright'))",
+            ],
+            text=True,
+            errors="ignore",
+            timeout=10,
+        ).strip()
+        findings.append(Finding(kind="python_playwright_ok", item="python-playwright", detail=out))
+    except Exception as e:
+        findings.append(
+            Finding(
+                kind="python_playwright_missing",
+                item="python-playwright",
+                detail=f"Python project detected but playwright import/version probe failed: {e}",
+                fix="pip install playwright && python -m playwright install",
+            )
+        )
+
+    return findings
+
+
+def check_node_playwright(check_dir: Path, probe: bool) -> tuple[list[Finding], Path | None]:
+    """Cross-OS best-effort Node Playwright detection.
+
+    Returns (findings, playwright_bin_path).
     """
     findings: list[Finding] = []
     pw_bin = check_dir / "node_modules" / ".bin" / ("playwright.cmd" if os_family() == "windows" else "playwright")
 
-    if pw_bin.exists():
-        if probe:
-            try:
-                out = subprocess.check_output([str(pw_bin), "--version"], text=True, errors="ignore")
-                findings.append(Finding(kind="playwright_ok", item="playwright", detail=out.strip()))
-            except Exception as e:
-                findings.append(
-                    Finding(
-                        kind="playwright_probe_failed",
-                        item="playwright",
-                        detail=f"Found {pw_bin} but failed to run --version: {e}",
-                        fix="Try reinstalling playwright (npm i -D playwright-chromium) and run npx playwright install",
-                    )
-                )
-        else:
+    if not pw_bin.exists():
+        return findings, None
+
+    if probe:
+        try:
+            out = subprocess.check_output([str(pw_bin), "--version"], text=True, errors="ignore", timeout=10)
+            findings.append(Finding(kind="playwright_ok", item="playwright", detail=out.strip()))
+        except Exception as e:
             findings.append(
                 Finding(
-                    kind="playwright_found",
+                    kind="playwright_probe_failed",
                     item="playwright",
-                    detail=f"Found local playwright binary at {pw_bin} (probe disabled)",
-                    fix="Re-run with --probe to verify runtime",
+                    detail=f"Found {pw_bin} but failed to run --version: {e}",
+                    fix="Try reinstalling playwright (npm i -D playwright-chromium) and run npx playwright install",
                 )
             )
+    else:
+        findings.append(
+            Finding(
+                kind="playwright_found",
+                item="playwright",
+                detail=f"Found local playwright binary at {pw_bin} (probe disabled)",
+                fix="Re-run with --probe to verify runtime",
+            )
+        )
+
+    return findings, pw_bin
+
+
+def check_chromium_launch_smoke(check_dir: Path, probe: bool) -> list[Finding]:
+    """Best-effort Chromium launch smoke test via Node Playwright.
+
+    This catches: browser not installed, missing system deps, sandbox issues.
+    """
+    if not probe:
+        return []
+
+    # Only attempt if Node Playwright exists
+    _, pw_bin = check_node_playwright(check_dir, probe=False)
+    if not pw_bin:
+        return []
+
+    # Use node script that prefers local package resolution.
+    js = (
+        "let pw; try { pw = require('playwright'); } catch(e) { try { pw = require('playwright-chromium'); } catch(e2) { throw e; } }"
+        "; const { chromium } = pw;"
+        "(async()=>{const b=await chromium.launch({headless:true});"
+        "const p=await b.newPage(); await p.goto('about:blank');"
+        "await b.close(); console.log('chromium_launch_ok');})().catch(e=>{"
+        "console.error('chromium_launch_failed'); console.error(String(e)); process.exit(2);});"
+    )
+
+    findings: list[Finding] = []
+    try:
+        out = subprocess.check_output(
+            ["node", "-e", js],
+            cwd=str(check_dir),
+            text=True,
+            errors="ignore",
+            timeout=15,
+            stderr=subprocess.STDOUT,
+        )
+        if "chromium_launch_ok" in out:
+            findings.append(
+                Finding(
+                    kind="chromium_launch_ok",
+                    item="chromium",
+                    detail="Chromium launched successfully via Playwright",
+                )
+            )
+        else:
+            findings.append(Finding(kind="chromium_launch_unknown", item="chromium", detail=out.strip()[:500]))
+    except subprocess.CalledProcessError as e:
+        msg = (e.output or "").strip()
+        findings.append(
+            Finding(
+                kind="chromium_launch_failed",
+                item="chromium",
+                detail=f"Playwright chromium launch failed: {msg[:700]}",
+                fix="Install JS deps (npm i -D playwright-chromium) then run: npx playwright install --with-deps (Linux) / npx playwright install (macOS/Windows)",
+            )
+        )
+    except Exception as e:
+        findings.append(
+            Finding(
+                kind="chromium_launch_failed",
+                item="chromium",
+                detail=f"Playwright chromium launch failed: {e}",
+                fix="Install JS deps (npm i -D playwright-chromium) then run: npx playwright install --with-deps (Linux) / npx playwright install (macOS/Windows)",
+            )
+        )
+
     return findings
 
 
@@ -330,7 +438,13 @@ def check_project_presets(check_dir: Path, probe: bool) -> list[Finding]:
             )
 
     findings += check_bins(sorted(needs))
-    findings += check_playwright_probe(check_dir, probe)
+
+    # Probes
+    findings += check_python_playwright(check_dir, probe)
+    node_findings, _ = check_node_playwright(check_dir, probe)
+    findings += node_findings
+    findings += check_chromium_launch_smoke(check_dir, probe)
+
     return findings
 
 

@@ -67,6 +67,10 @@ openclaw-skill-deps --skills-dir /path/to/workspace/skills --check-dir /path/to/
 
 开启轻量探针（best-effort）：
 
+- 检测 Python Playwright（`pip install playwright`）
+- 检测 Node Playwright（`node_modules/.bin/playwright`）
+- （如果存在 Node Playwright）尝试进行一次 **Chromium 无头启动 smoke test**
+
 ```bash
 openclaw-skill-deps --skills-dir /path/to/workspace/skills --check-dir /path/to/project --probe
 ```

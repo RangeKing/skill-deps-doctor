@@ -67,6 +67,10 @@ openclaw-skill-deps --skills-dir /path/to/workspace/skills --check-dir /path/to/
 
 Enable lightweight probes (best-effort):
 
+- Detect Python Playwright (`pip install playwright`)
+- Detect Node Playwright (`node_modules/.bin/playwright`)
+- (If Node Playwright exists) run a **Chromium headless launch smoke test**
+
 ```bash
 openclaw-skill-deps --skills-dir /path/to/workspace/skills --check-dir /path/to/project --probe
 ```
