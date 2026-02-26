@@ -1,0 +1,16 @@
+[project]
+name = "openclaw-skill-deps"
+version = "0.1.0"
+description = "Skill-level dependency doctor for OpenClaw"
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name="openclaw"}]
+dependencies = ["pyyaml>=6.0"]
+
+[project.scripts]
+openclaw-skill-deps = "openclaw_skill_deps.cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
