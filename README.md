@@ -59,6 +59,18 @@ Basic check (scan skills):
 openclaw-skill-deps --skills-dir /path/to/workspace/skills
 ```
 
+Scan a project directory for presets (Node/Python/Dockerfile):
+
+```bash
+openclaw-skill-deps --skills-dir /path/to/workspace/skills --check-dir /path/to/project
+```
+
+Enable lightweight probes (best-effort):
+
+```bash
+openclaw-skill-deps --skills-dir /path/to/workspace/skills --check-dir /path/to/project --probe
+```
+
 JSON output (good for CI):
 
 ```bash

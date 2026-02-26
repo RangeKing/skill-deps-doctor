@@ -136,7 +136,7 @@ def load_skill_requires(skill_md: Path) -> list[str]:
 
 
 from .parsers import parse_skill_md
-from .scanners import scan_project_dir
+from .scanners import scan_project_dir, parse_dockerfile_installs
 
 
 def scan_skills(skills_dir: Path) -> tuple[list[str], list[tuple[Path, list[dict]]]]:
@@ -257,9 +257,45 @@ def check_install_arrays(installs: list[tuple[Path, list[dict]]]) -> list[Findin
     return findings
 
 
-def check_project_presets(check_dir: Path) -> list[Finding]:
+def check_playwright_probe(check_dir: Path, probe: bool) -> list[Finding]:
+    """Cross-OS best-effort Playwright detection.
+
+    - Detect local node playwright in `node_modules/`.
+    - Optionally run `playwright --version` if available.
+    """
+    findings: list[Finding] = []
+    pw_bin = check_dir / "node_modules" / ".bin" / ("playwright.cmd" if os_family() == "windows" else "playwright")
+
+    if pw_bin.exists():
+        if probe:
+            try:
+                out = subprocess.check_output([str(pw_bin), "--version"], text=True, errors="ignore")
+                findings.append(Finding(kind="playwright_ok", item="playwright", detail=out.strip()))
+            except Exception as e:
+                findings.append(
+                    Finding(
+                        kind="playwright_probe_failed",
+                        item="playwright",
+                        detail=f"Found {pw_bin} but failed to run --version: {e}",
+                        fix="Try reinstalling playwright (npm i -D playwright-chromium) and run npx playwright install",
+                    )
+                )
+        else:
+            findings.append(
+                Finding(
+                    kind="playwright_found",
+                    item="playwright",
+                    detail=f"Found local playwright binary at {pw_bin} (probe disabled)",
+                    fix="Re-run with --probe to verify runtime",
+                )
+            )
+    return findings
+
+
+def check_project_presets(check_dir: Path, probe: bool) -> list[Finding]:
     sig = scan_project_dir(check_dir)
     needs: set[str] = set()
+    findings: list[Finding] = []
 
     # Node preset
     if sig.has_package_json:
@@ -272,14 +308,37 @@ def check_project_presets(check_dir: Path) -> list[Finding]:
     # Docker preset
     if sig.has_dockerfile:
         needs |= {"docker"}
+        # Parse Dockerfile packages for hints
+        pkgs = parse_dockerfile_installs(check_dir / "Dockerfile")
+        if pkgs.get("apt"):
+            findings.append(
+                Finding(
+                    kind="dockerfile_apt_packages",
+                    item="Dockerfile",
+                    detail=f"Detected apt-get packages: {' '.join(pkgs['apt'][:40])}" + (" …" if len(pkgs['apt'])>40 else ""),
+                    fix=None,
+                )
+            )
+        if pkgs.get("apk"):
+            findings.append(
+                Finding(
+                    kind="dockerfile_apk_packages",
+                    item="Dockerfile",
+                    detail=f"Detected apk packages: {' '.join(pkgs['apk'][:40])}" + (" …" if len(pkgs['apk'])>40 else ""),
+                    fix=None,
+                )
+            )
 
-    return check_bins(sorted(needs))
+    findings += check_bins(sorted(needs))
+    findings += check_playwright_probe(check_dir, probe)
+    return findings
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--skills-dir", required=True)
     ap.add_argument("--check-dir", default=None, help="Optional project/dir to scan for presets (Node/Python/Dockerfile)")
+    ap.add_argument("--probe", action="store_true", help="Run lightweight probes (e.g. playwright --version) when possible")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
@@ -293,7 +352,7 @@ def main() -> int:
     findings += check_playwright_libs()
 
     if args.check_dir:
-        findings += check_project_presets(Path(args.check_dir))
+        findings += check_project_presets(Path(args.check_dir), probe=args.probe)
 
     if args.json:
         print(json.dumps([f.__dict__ for f in findings], ensure_ascii=False, indent=2))

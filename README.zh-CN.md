@@ -59,6 +59,18 @@ pip install -e .
 openclaw-skill-deps --skills-dir /path/to/workspace/skills
 ```
 
+扫描工程目录预设（Node/Python/Dockerfile）：
+
+```bash
+openclaw-skill-deps --skills-dir /path/to/workspace/skills --check-dir /path/to/project
+```
+
+开启轻量探针（best-effort）：
+
+```bash
+openclaw-skill-deps --skills-dir /path/to/workspace/skills --check-dir /path/to/project --probe
+```
+
 JSON 输出（CI 推荐）：
 
 ```bash
