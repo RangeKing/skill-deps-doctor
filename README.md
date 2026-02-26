@@ -6,7 +6,7 @@
 
 Catch missing binaries / system libs / fonts *before* a skill fails at runtime.
 
-[![ci](./.github/workflows/ci.yml/badge.svg)](./.github/workflows/ci.yml)
+[![ci](https://github.com/RangeKing/openclaw-skill-deps/actions/workflows/ci.yml/badge.svg)](https://github.com/RangeKing/openclaw-skill-deps/actions/workflows/ci.yml)
 
 **🌐 Languages / 语言：**
 [English](README.md) · [简体中文](README.zh-CN.md)

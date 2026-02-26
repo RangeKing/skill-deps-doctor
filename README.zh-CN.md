@@ -6,7 +6,7 @@
 
 在 skill 真正执行失败之前，提前发现：缺二进制 / 缺系统库 / 缺字体。
 
-[![ci](./.github/workflows/ci.yml/badge.svg)](./.github/workflows/ci.yml)
+[![ci](https://github.com/RangeKing/openclaw-skill-deps/actions/workflows/ci.yml/badge.svg)](https://github.com/RangeKing/openclaw-skill-deps/actions/workflows/ci.yml)
 
 **🌐 语言 / Languages：**
 [English](README.md) · [简体中文](README.zh-CN.md)
