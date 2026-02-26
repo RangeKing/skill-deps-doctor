@@ -1,38 +1,86 @@
-# openclaw-skill-deps
+# 🧰 openclaw-skill-deps
 
-**A skill-level dependency doctor for OpenClaw.**
+<div align="center">
 
-## The pain point
-OpenClaw has `doctor` for gateway/config health, but *skill execution* often fails later for reasons that are:
-- OS libs missing (Playwright/Chromium libs like `libnspr4`, fonts like Noto CJK)
-- missing binaries (`pandoc`, `ffmpeg`, `uv`, `node`, etc.)
-- npm/python packages missing inside a deck/project
+**🩺 A skill-level dependency doctor for OpenClaw**
 
-These failures are hard to predict from the chat UI, and they waste cycles.
+Catch missing binaries / system libs / fonts *before* a skill fails at runtime.
 
-## The goal
-Provide a **deterministic, offline** preflight check:
-- Scan installed skills (`skills/*/SKILL.md`) + a target deck/dir
-- Infer required binaries and common system libs
-- Output actionable fixes (apt package list, npm install hints)
+[![ci](./.github/workflows/ci.yml/badge.svg)](./.github/workflows/ci.yml)
 
-This project intentionally **does not overlap** with existing browser relay plugins or web automation projects.
-It’s a diagnostic tool for dependency hygiene.
+**🌐 Languages / 语言：**
+[English](README.md) · [简体中文](README.zh-CN.md)
 
-## Usage
+</div>
+
+---
+
+## ✨ Why this exists (the pain point)
+OpenClaw has `doctor` for gateway/config health, but **skill execution** often fails later for reasons that are hard to predict from chat:
+
+- 🧱 **Missing OS libraries** (e.g. Playwright/Chromium deps like `libnspr4`, `libnss3`)
+- 🔤 **Missing fonts** (CJK PDF export shows tofu/□ without Noto CJK)
+- 🧪 **Missing binaries** (`pandoc`, `ffmpeg`, `uv`, `node`, …)
+- 📦 Project-local deps missing (npm / pip packages inside a deck/project)
+
+These failures waste cycles and produce error logs that are not actionable for most users.
+
+---
+
+## 🎯 What it does
+A **deterministic, offline** preflight check that:
+
+- 🔎 Scans installed skills (`skills/*/SKILL.md`) for declared `requires.bins`
+- ✅ Checks whether required binaries exist in `$PATH`
+- 🧩 Best-effort checks common runtime deps:
+  - shared libraries (via `ldconfig` when available)
+  - fonts (via `fc-list`)
+- 🧾 Prints **copy/paste fixes** (e.g. `apt-get install ...`)
+- 🤖 Optional `--json` output for CI/automation
+
+> This project intentionally **does not overlap** with existing browser relay plugins or web automation projects.
+> It focuses on *dependency hygiene* at the skill layer.
+
+---
+
+## 🚀 Install
+Editable install (recommended for dev):
+
 ```bash
-python -m openclaw_skill_deps --skills-dir /path/to/workspace/skills \
-  --check-dir /path/to/deck_or_project
+pip install -e .
 ```
 
-## Output
-- Missing binaries (with suggested install commands)
-- Missing shared libraries (best-effort via `ldconfig`/`ldd`)
-- Missing fonts (CJK PDF export)
-- Optional JSON output for CI
+---
 
-## Status
-MVP: focuses on the real-world pain we hit during Slidev export (Chromium libs + fonts).
+## 🧪 Usage
+Basic check (scan skills):
 
-## License
+```bash
+openclaw-skill-deps --skills-dir /path/to/workspace/skills
+```
+
+JSON output (good for CI):
+
+```bash
+openclaw-skill-deps --skills-dir /path/to/workspace/skills --json
+```
+
+---
+
+## 🧾 Output
+- ❌ Missing binaries (with suggested install commands)
+- ❌ Missing shared libraries (best-effort)
+- ❌ Missing fonts (CJK PDF export)
+- ✅ Clear next-step “Fix:” hints
+
+---
+
+## 🗺️ Roadmap
+- Detect Playwright presence and run a lightweight `chromium --version` probe (best-effort)
+- Add per-skill “dependency profiles” for common stacks (Slidev, Whisper, PDF tooling)
+- Add `--fix` (generate a script), without auto-running privileged installs
+
+---
+
+## 📄 License
 MIT
