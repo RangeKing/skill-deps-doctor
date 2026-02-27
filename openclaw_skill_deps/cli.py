@@ -13,14 +13,21 @@ from .checkers import (
     check_project_presets,
     check_projects_recursive,
     check_transitive_deps,
+    detect_playwright_runtime_need,
     scan_skills,
 )
 from .fix_gen import generate_fix_script
 from .graph import build_graph, render_dot, render_platform_matrix, render_tree
-from .hints import init_hint_db, os_family
+from .hints import get_hint_db, init_hint_db, os_family
 from .models import CheckContext, Finding
-from .plugins import run_plugins
+from .plugins import plugin_api_version, run_plugins
 from .profiles import check_profile, list_profiles
+from .snapshot import (
+    build_snapshot,
+    find_new_findings,
+    load_baseline_findings,
+    write_snapshot,
+)
 from .versions import check_bin_versions
 
 _SEVERITY_ICON = {"error": "[ERR]", "warn": "[WARN]", "info": "[INFO]"}
@@ -97,6 +104,28 @@ def main() -> int:
         action="store_true",
         help="Display a multi-platform fix matrix for all actionable findings",
     )
+    ap.add_argument(
+        "--validate-hints",
+        action="store_true",
+        help="Validate merged hints schema (built-in + --hints-file) and exit",
+    )
+    ap.add_argument(
+        "--snapshot",
+        default=None,
+        metavar="PATH",
+        help="Write a JSON snapshot (environment + findings) to PATH",
+    )
+    ap.add_argument(
+        "--baseline",
+        default=None,
+        metavar="PATH",
+        help="Compare current findings against a baseline JSON/snapshot file",
+    )
+    ap.add_argument(
+        "--fail-on-new",
+        action="store_true",
+        help="With --baseline, fail if new warn/error findings are introduced",
+    )
 
     verbosity = ap.add_mutually_exclusive_group()
     verbosity.add_argument(
@@ -111,7 +140,20 @@ def main() -> int:
 
     # -- initialise hint DB ------------------------------------------------
     override = Path(args.hints_file) if args.hints_file else None
-    init_hint_db(override)
+    db = init_hint_db(override)
+
+    if args.validate_hints:
+        errs = db.validation_errors
+        if errs:
+            print("HINTS INVALID:")
+            for e in errs:
+                print(f"  - {e}")
+            return 2
+        print(
+            f"HINTS OK (schema_version={db.schema_version}, "
+            f"expected={db.expected_schema_version})"
+        )
+        return 0
 
     # -- list-profiles (early exit) ----------------------------------------
     if args.list_profiles:
@@ -137,16 +179,36 @@ def main() -> int:
 
     # -- collect findings --------------------------------------------------
     bins, installs, bin_specs = scan_skills(skills_dir)
+    check_path = Path(args.check_dir) if args.check_dir else None
+    playwright_reasons = detect_playwright_runtime_need(
+        skills_dir=skills_dir,
+        check_dir=check_path,
+        profiles=args.profile,
+    )
 
     findings: list[Finding] = []
+    for err in get_hint_db().validation_errors:
+        findings.append(
+            Finding(
+                kind="hints_schema_warning",
+                item=str(override) if override else "builtin:hints.yaml",
+                detail=err,
+                severity="warn",
+                code="HINTS_SCHEMA_INVALID",
+                confidence="high",
+            )
+        )
     findings += check_bins(bins)
     findings += check_bin_versions(bin_specs)
     findings += check_install_arrays(installs)
     findings += check_fonts()
-    findings += check_playwright_libs()
+    findings += check_playwright_libs(
+        enabled=bool(playwright_reasons),
+        reason="; ".join(playwright_reasons),
+    )
 
     if args.check_dir:
-        check_path = Path(args.check_dir)
+        assert check_path is not None
         if args.recursive:
             findings += check_projects_recursive(check_path, probe=args.probe)
         else:
@@ -163,25 +225,68 @@ def main() -> int:
             probe=args.probe,
             profiles=args.profile,
             recursive=args.recursive,
+            plugin_api_version=plugin_api_version(),
         )
         findings += run_plugins(ctx)
 
+    new_since_baseline: list[Finding] = []
+    if args.baseline:
+        baseline_path = Path(args.baseline)
+        try:
+            baseline_entries = load_baseline_findings(baseline_path)
+        except ValueError as e:
+            findings.append(
+                Finding(
+                    kind="baseline_invalid",
+                    item=str(baseline_path),
+                    detail=str(e),
+                    severity="error",
+                    code="BASELINE_INVALID",
+                    confidence="high",
+                )
+            )
+        else:
+            new_since_baseline = find_new_findings(findings, baseline_entries)
+
     errors = [f for f in findings if f.severity == "error"]
+    exit_code = 2 if errors else 0
+    if args.fail_on_new and new_since_baseline:
+        exit_code = 3
+
+    if args.snapshot:
+        snapshot_path = Path(args.snapshot)
+        snapshot = build_snapshot(
+            findings,
+            skills_dir=skills_dir,
+            check_dir=check_path,
+            profiles=args.profile,
+            probe=args.probe,
+            recursive=args.recursive,
+            no_plugins=args.no_plugins,
+            hints_file=override,
+            baseline_path=Path(args.baseline) if args.baseline else None,
+            new_since_baseline=new_since_baseline if args.baseline else None,
+        )
+        write_snapshot(snapshot_path, snapshot)
 
     # -- platform matrix mode ----------------------------------------------
     if args.platform_matrix:
         print(render_platform_matrix(findings))
-        return 2 if errors else 0
+        if args.baseline and new_since_baseline and not args.quiet:
+            print(f"\nBASELINE: {len(new_since_baseline)} new warn/error finding(s)")
+        return exit_code
 
     # -- fix mode ----------------------------------------------------------
     if args.fix:
         print(generate_fix_script(findings))
-        return 2 if errors else 0
+        if args.baseline and new_since_baseline and not args.quiet:
+            print(f"\nBASELINE: {len(new_since_baseline)} new warn/error finding(s)")
+        return exit_code
 
     # -- json mode ---------------------------------------------------------
     if args.json_output:
         print(json.dumps([f.__dict__ for f in findings], ensure_ascii=False, indent=2))
-        return 2 if errors else 0
+        return exit_code
 
     # -- human-readable output ---------------------------------------------
     display = _filter_by_verbosity(
@@ -191,7 +296,12 @@ def main() -> int:
     if not display:
         if not args.quiet:
             print("PASS: no obvious missing skill dependencies")
-        return 2 if errors else 0
+            if args.baseline:
+                if new_since_baseline:
+                    print(f"\nBASELINE: {len(new_since_baseline)} new warn/error finding(s)")
+                else:
+                    print("\nBASELINE: no new warn/error findings")
+        return exit_code
 
     if errors:
         print(f"FAIL: {len(errors)} error(s) detected\n")
@@ -207,7 +317,16 @@ def main() -> int:
         if f.fix:
             print(f"    Fix: {f.fix}")
 
-    return 2 if errors else 0
+    if args.baseline and not args.quiet:
+        if new_since_baseline:
+            print(f"\nBASELINE: {len(new_since_baseline)} new warn/error finding(s)")
+            if args.verbose:
+                for f in new_since_baseline:
+                    print(f"  + [{f.severity}] [{f.kind}] {f.item}")
+        else:
+            print("\nBASELINE: no new warn/error findings")
+
+    return exit_code
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -8,6 +9,19 @@ from .hints import get_hint_db, os_family, which
 from .models import Finding
 from .parsers import parse_skill_md
 from .scanners import discover_projects, parse_dockerfile_installs, scan_project_dir
+
+_PLAYWRIGHT_BIN_NAMES = {
+    "playwright",
+    "playwright-chromium",
+    "puppeteer",
+    "chromium",
+}
+_PLAYWRIGHT_PKG_NAMES = {
+    "playwright",
+    "playwright-chromium",
+    "puppeteer",
+}
+_PLAYWRIGHT_CORE_LIBS = {"libnspr4.so", "libnss3.so"}
 
 
 def scan_skills(
@@ -38,6 +52,9 @@ def check_bins(bins: list[str]) -> list[Finding]:
                     item=b,
                     detail=f"Binary '{b}' not found in PATH",
                     fix=db.fix_for_bin(b),
+                    code="MISSING_BIN",
+                    evidence=f"shutil.which('{b}') returned None",
+                    confidence="high",
                 )
             )
     return findings
@@ -54,10 +71,30 @@ def check_fonts() -> list[Finding]:
                 detail="fontconfig not available; cannot verify fonts",
                 fix=db.fix_for_bin("fc-list"),
                 severity="warn",
+                code="FONT_PROBE_UNAVAILABLE",
+                evidence="Binary 'fc-list' not found in PATH",
+                confidence="high",
             )
         ]
 
-    out = subprocess.check_output(["fc-list"], text=True, errors="ignore")
+    try:
+        out = subprocess.check_output(
+            ["fc-list"], text=True, errors="ignore", timeout=10,
+        )
+    except Exception as e:
+        return [
+            Finding(
+                kind="font_probe_failed",
+                item="fc-list",
+                detail=f"fontconfig probe failed: {e}",
+                fix="Run 'fc-list' manually to verify fontconfig health; then retry checks",
+                severity="warn",
+                code="FONT_PROBE_FAILED",
+                evidence=str(e),
+                confidence="low",
+            )
+        ]
+
     findings: list[Finding] = []
 
     for font_name, entry in db.font_hints.items():
@@ -71,14 +108,75 @@ def check_fonts() -> list[Finding]:
                     detail=f"CJK PDF export may show tofu (\u25a1) without '{font_name}'",
                     fix=fix,
                     severity="warn",
+                    code="MISSING_FONT",
+                    evidence=f"fc-list output missing any of: {patterns}",
+                    confidence="medium",
                 )
             )
 
     return findings
 
 
-def check_playwright_libs() -> list[Finding]:
+def detect_playwright_runtime_need(
+    *,
+    skills_dir: Path | None = None,
+    check_dir: Path | None = None,
+    profiles: list[str] | None = None,
+) -> list[str]:
+    """Return evidence strings indicating why Playwright libs should be checked."""
+    reasons: set[str] = set()
+
+    if skills_dir is not None:
+        for p in skills_dir.glob("*/SKILL.md"):
+            sm = parse_skill_md(p)
+            skill = p.parent.name
+            for spec in sm.bin_specs:
+                name = re.split(r"[><=!]", spec)[0].strip().lower()
+                if name in _PLAYWRIGHT_BIN_NAMES:
+                    reasons.add(f"skill:{skill}:requires-bin:{name}")
+            for install_entry in sm.install:
+                pkg = install_entry.get("package")
+                if isinstance(pkg, str) and pkg.lower() in _PLAYWRIGHT_PKG_NAMES:
+                    reasons.add(f"skill:{skill}:install-package:{pkg.lower()}")
+                bins = install_entry.get("bins") or []
+                if isinstance(bins, list):
+                    for b in bins:
+                        if not isinstance(b, str):
+                            continue
+                        name = re.split(r"[><=!]", b)[0].strip().lower()
+                        if name in _PLAYWRIGHT_BIN_NAMES:
+                            reasons.add(f"skill:{skill}:install-bin:{name}")
+
+    if check_dir is not None:
+        sig = scan_project_dir(check_dir)
+        for pkg in sig.npm_deps:
+            name = pkg.lower()
+            if name in _PLAYWRIGHT_PKG_NAMES:
+                reasons.add(f"project:npm:{name}")
+        for pkg in sig.pip_deps:
+            name = pkg.lower()
+            if name in _PLAYWRIGHT_PKG_NAMES:
+                reasons.add(f"project:pip:{name}")
+
+    if profiles:
+        db = get_hint_db()
+        for profile_name in profiles:
+            profile = db.profiles.get(profile_name) or {}
+            libs = {
+                x for x in profile.get("libs", [])
+                if isinstance(x, str)
+            }
+            if libs.intersection(_PLAYWRIGHT_CORE_LIBS):
+                reasons.add(f"profile:{profile_name}:core-playwright-libs")
+
+    return sorted(reasons)
+
+
+def check_playwright_libs(*, enabled: bool = True, reason: str | None = None) -> list[Finding]:
     """Best-effort Playwright/Chromium shared-lib checks (Linux only)."""
+    if not enabled:
+        return []
+
     if os_family() != "linux":
         return []
 
@@ -92,14 +190,17 @@ def check_playwright_libs() -> list[Finding]:
 
     db = get_hint_db()
     findings: list[Finding] = []
-    for so, entry in db.lib_hints.items():
+    for so, _entry in db.lib_hints.items():
         if so.replace(".so", "") not in out and so not in out:
             findings.append(
                 Finding(
                     kind="missing_lib",
                     item=so,
                     detail="Likely required by Chromium/Playwright export",
-                    fix=entry.get("apt"),
+                    fix=db.fix_for_lib(so),
+                    code="PLAYWRIGHT_LIB_MISSING",
+                    evidence=reason or f"'{so}' not found in ldconfig -p output",
+                    confidence="medium",
                 )
             )
 
@@ -150,7 +251,7 @@ def check_package_deps(
             continue
         note = info.get("note")
         apt = info.get("apt")
-        fix = apt if fam == "linux" and apt else note
+        fix = db.normalize_fix_command(apt, family="linux") if fam == "linux" and apt else note
         findings.append(
             Finding(
                 kind="package_dep_hint",
@@ -167,7 +268,7 @@ def check_package_deps(
             continue
         note = info.get("note")
         apt = info.get("apt")
-        fix = apt if fam == "linux" and apt else note
+        fix = db.normalize_fix_command(apt, family="linux") if fam == "linux" and apt else note
         findings.append(
             Finding(
                 kind="package_dep_hint",

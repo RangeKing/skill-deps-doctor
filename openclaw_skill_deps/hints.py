@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import re
+import shlex
 import shutil
 import sys
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+from .schemas import HINTS_SCHEMA_VERSION, validate_hints_data
 
 _DATA_DIR = Path(__file__).parent / "data"
 
@@ -48,6 +52,8 @@ _COMMAND_PREFIXES = (
     "xcode-select ",
 )
 
+_APT_INSTALL_RE = re.compile(r"^(?:sudo\s+)?(?:apt-get|apt)\s+install(?:\s+-y)?\s+(.+)$")
+
 
 def extract_cmd(fix: str) -> str | None:
     """Return the runnable portion of a fix hint, or *None* for manual steps."""
@@ -58,6 +64,89 @@ def extract_cmd(fix: str) -> str | None:
         if fix.startswith(prefix):
             return fix
     return None
+
+
+def detect_linux_pkg_manager() -> str | None:
+    """Best-effort detect the Linux package manager available on this host."""
+    if os_family() != "linux":
+        return None
+
+    distro_tags = _linux_distro_tags()
+    preferred: list[str] = []
+    if any(x in distro_tags for x in ("debian", "ubuntu", "mint", "kali", "pop")):
+        preferred = ["apt-get", "apt"]
+    elif any(x in distro_tags for x in ("fedora", "rhel", "centos", "rocky", "almalinux", "amzn")):
+        preferred = ["dnf", "yum"]
+    elif any(x in distro_tags for x in ("alpine",)):
+        preferred = ["apk"]
+    elif any(x in distro_tags for x in ("arch", "manjaro")):
+        preferred = ["pacman"]
+
+    candidates = preferred + ["apt-get", "apt", "dnf", "yum", "apk", "pacman"]
+    seen: set[str] = set()
+    for name in candidates:
+        if name in seen:
+            continue
+        seen.add(name)
+        if which(name):
+            return name
+    return None
+
+
+def _linux_distro_tags() -> set[str]:
+    path = Path("/etc/os-release")
+    try:
+        txt = path.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return set()
+
+    values: list[str] = []
+    for line in txt.splitlines():
+        if "=" not in line:
+            continue
+        key, raw = line.split("=", 1)
+        key = key.strip()
+        if key not in {"ID", "ID_LIKE"}:
+            continue
+        values.append(raw.strip().strip('"').strip("'").lower())
+
+    tags: set[str] = set()
+    for value in values:
+        tags.update(x for x in value.split() if x)
+    return tags
+
+
+def _extract_packages_from_apt_install(expr: str) -> str:
+    try:
+        tokens = shlex.split(expr)
+    except ValueError:
+        return ""
+    packages = [t for t in tokens if t and not t.startswith("-")]
+    return " ".join(packages)
+
+
+def _adapt_linux_install_hint(cmd: str) -> str:
+    """Rewrite apt/apt-get install hints for the host Linux package manager."""
+    m = _APT_INSTALL_RE.match(cmd.strip())
+    if not m:
+        return cmd
+
+    packages = _extract_packages_from_apt_install(m.group(1))
+    if not packages:
+        return cmd
+
+    manager = detect_linux_pkg_manager()
+    if manager in ("apt-get", "apt"):
+        return f"sudo {manager} install -y {packages}"
+    if manager == "dnf":
+        return f"sudo dnf install -y {packages}"
+    if manager == "yum":
+        return f"sudo yum install -y {packages}"
+    if manager == "apk":
+        return f"sudo apk add --no-cache {packages}"
+    if manager == "pacman":
+        return f"sudo pacman -S --needed --noconfirm {packages}"
+    return cmd
 
 
 # ---------------------------------------------------------------------------
@@ -79,6 +168,8 @@ class HintDB:
         base = _load_yaml(_DATA_DIR / "hints.yaml")
         if override_path:
             user = _load_yaml(override_path)
+            if "schema_version" in user:
+                base["schema_version"] = user["schema_version"]
             merge_keys = (
                 "bins", "libs", "fonts", "profiles", "package_deps",
                 "version_commands", "transitive_deps",
@@ -86,6 +177,13 @@ class HintDB:
             for key in merge_keys:
                 if key in user:
                     base.setdefault(key, {}).update(user[key])
+
+        self._schema_version: int | None = (
+            base.get("schema_version")
+            if isinstance(base.get("schema_version"), int)
+            else None
+        )
+        self._validation_errors = validate_hints_data(base)
 
         self._bins: dict[str, dict[str, str]] = base.get("bins", {})
         self._libs: dict[str, dict[str, str]] = base.get("libs", {})
@@ -113,7 +211,8 @@ class HintDB:
         fam = os_family()
         if entry is None:
             return self._generic_bin_hint(bin_name)
-        return entry.get(fam) or entry.get("_all") or self._generic_bin_hint(bin_name)
+        hint = entry.get(fam) or entry.get("_all") or self._generic_bin_hint(bin_name)
+        return self.normalize_fix_command(hint, family=fam)
 
     @staticmethod
     def _generic_bin_hint(bin_name: str) -> str:
@@ -137,7 +236,7 @@ class HintDB:
         entry = self._libs.get(lib_name)
         if entry is None:
             return None
-        return entry.get("apt")
+        return self.normalize_fix_command(entry.get("apt"), family="linux")
 
     # -- font hints --------------------------------------------------------
 
@@ -149,7 +248,8 @@ class HintDB:
         entry = self._fonts.get(font_name)
         if entry is None:
             return None
-        return entry.get(os_family())
+        fam = os_family()
+        return self.normalize_fix_command(entry.get(fam), family=fam)
 
     def fc_match_patterns(self, font_name: str) -> list[str]:
         entry = self._fonts.get(font_name)
@@ -208,10 +308,34 @@ class HintDB:
         platforms = {}
         for fam in ("linux", "macos", "windows"):
             if entry:
-                platforms[fam] = entry.get(fam) or entry.get("_all")
+                hint = entry.get(fam) or entry.get("_all")
+                platforms[fam] = self.normalize_fix_command(hint, family=fam)
             else:
                 platforms[fam] = self._generic_bin_hint_for(bin_name, fam)
         return platforms
+
+    def normalize_fix_command(
+        self, fix: str | None, *, family: str | None = None,
+    ) -> str | None:
+        """Normalize fix command text to host platform conventions when possible."""
+        if fix is None:
+            return None
+        fam = family or os_family()
+        if fam == "linux":
+            return _adapt_linux_install_hint(fix)
+        return fix
+
+    @property
+    def schema_version(self) -> int | None:
+        return self._schema_version
+
+    @property
+    def expected_schema_version(self) -> int:
+        return HINTS_SCHEMA_VERSION
+
+    @property
+    def validation_errors(self) -> list[str]:
+        return list(self._validation_errors)
 
     @staticmethod
     def _generic_bin_hint_for(bin_name: str, fam: str) -> str:
@@ -260,3 +384,7 @@ def reset_hint_db() -> None:
 
 def fix_for_bin(bin_name: str) -> str | None:
     return get_hint_db().fix_for_bin(bin_name)
+
+
+def normalize_fix_command(fix: str | None) -> str | None:
+    return get_hint_db().normalize_fix_command(fix)

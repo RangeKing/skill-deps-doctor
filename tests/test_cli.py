@@ -268,3 +268,90 @@ class TestPlatformMatrix:
         assert "macOS" in out
         assert "Windows" in out
         assert "node" in out
+
+
+class TestSnapshotAndBaseline:
+    @patch("openclaw_skill_deps.checkers.which", return_value=None)
+    def test_snapshot_file_written(self, _mock_which, tmp_path, capsys):
+        skills = tmp_path / "skills"
+        skills.mkdir()
+        _make_skill(skills, "s", ["missing_tool"])
+        snapshot = tmp_path / "reports" / "snapshot.json"
+
+        with patch("sys.argv", [
+            "prog", "--skills-dir", str(skills), "--json", "--snapshot", str(snapshot),
+        ]):
+            rc = main()
+
+        assert rc == 2
+        payload = json.loads(snapshot.read_text(encoding="utf-8"))
+        assert "schema_version" in payload
+        assert "findings" in payload
+        _ = capsys.readouterr()
+
+    @patch("openclaw_skill_deps.checkers.which", return_value=None)
+    def test_fail_on_new_uses_exit_3(self, _mock_which, tmp_path, capsys):
+        skills = tmp_path / "skills"
+        skills.mkdir()
+
+        baseline = tmp_path / "baseline.json"
+        baseline.write_text("[]", encoding="utf-8")
+
+        with patch("sys.argv", [
+            "prog", "--skills-dir", str(skills),
+            "--baseline", str(baseline), "--fail-on-new", "-q",
+        ]):
+            rc = main()
+
+        assert rc == 3
+        _ = capsys.readouterr()
+
+    @patch("openclaw_skill_deps.checkers.which", return_value="/usr/bin/fc-list")
+    @patch("openclaw_skill_deps.checkers.subprocess")
+    def test_invalid_baseline_becomes_error(self, mock_sp, _mock_which, tmp_path, capsys):
+        mock_sp.check_output.return_value = "Noto Sans CJK SC\nWenQuanYi Zen Hei"
+        skills = tmp_path / "skills"
+        skills.mkdir()
+
+        baseline = tmp_path / "baseline.json"
+        baseline.write_text('{"foo":1}', encoding="utf-8")
+
+        with patch("sys.argv", [
+            "prog", "--skills-dir", str(skills), "--baseline", str(baseline), "--json",
+        ]):
+            rc = main()
+
+        assert rc == 2
+        data = json.loads(capsys.readouterr().out)
+        assert any(d["kind"] == "baseline_invalid" for d in data)
+
+
+class TestValidateHintsFlag:
+    def test_validate_hints_ok(self, tmp_path, capsys):
+        skills = tmp_path / "skills"
+        skills.mkdir()
+
+        with patch("sys.argv", ["prog", "--skills-dir", str(skills), "--validate-hints"]):
+            rc = main()
+
+        assert rc == 0
+        out = capsys.readouterr().out
+        assert "HINTS OK" in out
+
+    def test_validate_hints_invalid(self, tmp_path, capsys):
+        skills = tmp_path / "skills"
+        skills.mkdir()
+        hints = tmp_path / "bad-hints.yaml"
+        hints.write_text("schema_version: 999\nbins: {}\n", encoding="utf-8")
+
+        with patch("sys.argv", [
+            "prog",
+            "--skills-dir", str(skills),
+            "--hints-file", str(hints),
+            "--validate-hints",
+        ]):
+            rc = main()
+
+        assert rc == 2
+        out = capsys.readouterr().out
+        assert "HINTS INVALID" in out

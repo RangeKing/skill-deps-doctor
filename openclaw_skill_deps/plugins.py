@@ -5,6 +5,7 @@ import logging
 from typing import Callable
 
 from .models import CheckContext, Finding
+from .schemas import PLUGIN_API_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +53,41 @@ def run_plugins(
     for name, func in plugins:
         try:
             results = func(ctx)
-            for f in results:
+            if not isinstance(results, list):
+                findings.append(
+                    Finding(
+                        kind="plugin_invalid_result",
+                        item=name,
+                        detail=(
+                            f"[plugin:{name}] expected list[Finding], got "
+                            f"{type(results).__name__}"
+                        ),
+                        severity="warn",
+                        code="PLUGIN_RESULT_INVALID",
+                        confidence="high",
+                    )
+                )
+                continue
+
+            for idx, f in enumerate(results):
+                if not isinstance(f, Finding):
+                    findings.append(
+                        Finding(
+                            kind="plugin_invalid_result",
+                            item=name,
+                            detail=(
+                                f"[plugin:{name}] result[{idx}] is "
+                                f"{type(f).__name__}, expected Finding"
+                            ),
+                            severity="warn",
+                            code="PLUGIN_RESULT_INVALID",
+                            confidence="high",
+                        )
+                    )
+                    continue
                 if not f.detail.startswith(f"[plugin:{name}]"):
                     f.detail = f"[plugin:{name}] {f.detail}"
-            findings.extend(results)
+                findings.append(f)
         except Exception:
             logger.warning("Plugin %r raised an exception", name, exc_info=True)
             findings.append(
@@ -67,3 +99,7 @@ def run_plugins(
                 )
             )
     return findings
+
+
+def plugin_api_version() -> int:
+    return PLUGIN_API_VERSION

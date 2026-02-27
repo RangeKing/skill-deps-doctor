@@ -5,9 +5,11 @@ import pytest
 
 from openclaw_skill_deps.hints import (
     HintDB,
+    detect_linux_pkg_manager,
     extract_cmd,
     get_hint_db,
     init_hint_db,
+    normalize_fix_command,
     os_family,
     reset_hint_db,
     which,
@@ -78,7 +80,7 @@ class TestHintDB:
         db = HintDB()
         fix = db.fix_for_bin("git")
         assert fix is not None
-        assert "apt-get" in fix
+        assert "install" in fix
 
     @patch("openclaw_skill_deps.hints.os_family", return_value="macos")
     def test_platform_specific_macos(self, _mock):
@@ -159,3 +161,28 @@ class TestExtractCmd:
 
     def test_unknown_prefix_returns_none(self):
         assert extract_cmd("Download from https://example.com") is None
+
+
+class TestLinuxPkgManager:
+    @patch("openclaw_skill_deps.hints._linux_distro_tags", return_value={"fedora"})
+    @patch("openclaw_skill_deps.hints.which", side_effect=lambda n: "/usr/bin/" + n if n in {"apt-get", "dnf"} else None)
+    @patch("openclaw_skill_deps.hints.os_family", return_value="linux")
+    def test_prefers_distro_match_over_other_installed(self, _mock_os, _mock_which, _mock_tags):
+        assert detect_linux_pkg_manager() == "dnf"
+
+    @patch("openclaw_skill_deps.hints.which", side_effect=lambda n: "/usr/bin/dnf" if n == "dnf" else None)
+    @patch("openclaw_skill_deps.hints.os_family", return_value="linux")
+    def test_detect_dnf(self, _mock_os, _mock_which):
+        assert detect_linux_pkg_manager() == "dnf"
+
+    @patch("openclaw_skill_deps.hints.which", side_effect=lambda n: "/usr/bin/apk" if n == "apk" else None)
+    @patch("openclaw_skill_deps.hints.os_family", return_value="linux")
+    def test_normalize_apk(self, _mock_os, _mock_which):
+        cmd = normalize_fix_command("sudo apt-get install -y libpq-dev build-essential")
+        assert cmd == "sudo apk add --no-cache libpq-dev build-essential"
+
+    @patch("openclaw_skill_deps.hints.which", side_effect=lambda n: "/usr/bin/pacman" if n == "pacman" else None)
+    @patch("openclaw_skill_deps.hints.os_family", return_value="linux")
+    def test_normalize_pacman(self, _mock_os, _mock_which):
+        cmd = normalize_fix_command("sudo apt-get install -y ffmpeg")
+        assert cmd == "sudo pacman -S --needed --noconfirm ffmpeg"

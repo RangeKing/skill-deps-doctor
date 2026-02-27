@@ -8,6 +8,9 @@ class TestFinding:
         f = Finding(kind="missing_bin", item="node", detail="not found")
         assert f.severity == "error"
         assert f.fix is None
+        assert f.code is None
+        assert f.evidence is None
+        assert f.confidence is None
 
     def test_custom_severity(self):
         f = Finding(kind="info", item="x", detail="ok", severity="info")
@@ -26,6 +29,9 @@ class TestFinding:
             "detail": "d",
             "fix": "f",
             "severity": "warn",
+            "code": None,
+            "evidence": None,
+            "confidence": None,
         }
 
 
@@ -36,6 +42,7 @@ class TestCheckContext:
         assert ctx.probe is False
         assert ctx.profiles == []
         assert ctx.recursive is False
+        assert ctx.plugin_api_version == 1
 
     def test_full(self):
         ctx = CheckContext(
@@ -44,7 +51,9 @@ class TestCheckContext:
             probe=True,
             profiles=["slidev"],
             recursive=True,
+            plugin_api_version=2,
         )
         assert ctx.check_dir == Path("/project")
         assert ctx.profiles == ["slidev"]
         assert ctx.recursive is True
+        assert ctx.plugin_api_version == 2

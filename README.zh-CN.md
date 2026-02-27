@@ -81,6 +81,24 @@ JSON 输出（CI 推荐）：
 openclaw-skill-deps --skills-dir /path/to/workspace/skills --json
 ```
 
+写入可复现环境快照：
+
+```bash
+openclaw-skill-deps --skills-dir /path/to/workspace/skills --snapshot .openclaw/snapshot.json
+```
+
+对比 baseline 并对新增问题做门禁：
+
+```bash
+openclaw-skill-deps --skills-dir /path/to/workspace/skills --baseline .openclaw/baseline.json --fail-on-new
+```
+
+校验 hints schema（内置 + 可选 override）：
+
+```bash
+openclaw-skill-deps --skills-dir /path/to/workspace/skills --validate-hints
+```
+
 ---
 
 ## 🧾 输出内容
@@ -88,6 +106,33 @@ openclaw-skill-deps --skills-dir /path/to/workspace/skills --json
 - ❌ 缺失共享库（best-effort）
 - ❌ 缺失字体（CJK PDF 导出）
 - ✅ 明确的“下一步怎么修”提示
+
+JSON 模式（`--json`）每条告警输出一个对象，字段契约如下：
+
+- `kind`：问题类型
+- `item`：依赖标识
+- `detail`：可读诊断信息
+- `fix`：修复建议命令/文本（可为空）
+- `severity`：`error | warn | info`
+- `code`：可选，机器可读原因码
+- `evidence`：可选，探针证据片段
+- `confidence`：可选，置信度（`high | medium | low`）
+
+快照模式（`--snapshot`）会写入一个 JSON 外层对象，包含：
+
+- `schema_version`、`created_at_utc`
+- `environment`（OS 家族 / 平台 / Python 版本）
+- `inputs`（本次运行使用的 CLI 参数）
+- `findings`（与 `--json` 相同的告警数组）
+- 可选 `baseline` 对比结果（`new_findings_count`、`new_findings`）
+
+`hints.yaml` 通过顶层 `schema_version` 做版本化管理。
+当前期望版本：`1`。
+
+插件契约：
+
+- Checker 插件必须返回 `list[Finding]`
+- `CheckContext.plugin_api_version` 表示插件 API 版本（当前：`1`）
 
 ---
 

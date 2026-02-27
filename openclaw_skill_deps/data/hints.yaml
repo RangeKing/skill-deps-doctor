@@ -1,5 +1,6 @@
 # openclaw-skill-deps hint database
 # Community contributions welcome — just add entries and open a PR!
+schema_version: 1
 
 bins:
   # ── JavaScript / Node ──────────────────────────────────────────────

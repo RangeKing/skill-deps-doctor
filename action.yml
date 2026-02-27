@@ -26,6 +26,20 @@ inputs:
   hints-file:
     description: "Path to custom hints YAML override"
     required: false
+  snapshot-file:
+    description: "Write full environment + findings snapshot JSON to this path (optional)"
+    required: false
+  baseline-file:
+    description: "Baseline JSON/snapshot file to compare current findings against (optional)"
+    required: false
+  fail-on-new:
+    description: "When baseline-file is provided, fail if new warn/error findings are introduced"
+    required: false
+    default: "false"
+  validate-hints:
+    description: "Validate merged hints schema and exit early"
+    required: false
+    default: "false"
   python-version:
     description: "Python version to use"
     required: false
@@ -33,7 +47,7 @@ inputs:
 
 outputs:
   exit-code:
-    description: "0 = pass, 2 = errors found"
+    description: "0 = pass, 2 = errors found, 3 = new findings vs baseline (when fail-on-new=true)"
     value: ${{ steps.run.outputs.exit_code }}
   json-report:
     description: "JSON array of all findings"
@@ -57,37 +71,63 @@ runs:
       run: |
         set +e
 
-        ARGS="--skills-dir ${{ inputs.skills-dir }}"
+        trim() {
+          local s="$1"
+          s="${s#"${s%%[![:space:]]*}"}"
+          s="${s%"${s##*[![:space:]]}"}"
+          printf '%s' "$s"
+        }
 
-        if [ -n "${{ inputs.check-dir }}" ]; then
-          ARGS="$ARGS --check-dir ${{ inputs.check-dir }}"
+        ARGS=(--skills-dir "${{ inputs.skills-dir }}")
+
+        if [[ -n "${{ inputs.check-dir }}" ]]; then
+          ARGS+=(--check-dir "${{ inputs.check-dir }}")
         fi
 
-        if [ "${{ inputs.recursive }}" = "true" ]; then
-          ARGS="$ARGS --recursive"
+        if [[ "${{ inputs.recursive }}" == "true" ]]; then
+          ARGS+=(--recursive)
         fi
 
-        if [ "${{ inputs.probe }}" = "true" ]; then
-          ARGS="$ARGS --probe"
+        if [[ "${{ inputs.probe }}" == "true" ]]; then
+          ARGS+=(--probe)
         fi
 
-        if [ -n "${{ inputs.hints-file }}" ]; then
-          ARGS="$ARGS --hints-file ${{ inputs.hints-file }}"
+        if [[ -n "${{ inputs.hints-file }}" ]]; then
+          ARGS+=(--hints-file "${{ inputs.hints-file }}")
         fi
 
-        if [ -n "${{ inputs.profile }}" ]; then
-          IFS=',' read -ra PROFILES <<< "${{ inputs.profile }}"
+        if [[ -n "${{ inputs.snapshot-file }}" ]]; then
+          ARGS+=(--snapshot "${{ inputs.snapshot-file }}")
+        fi
+
+        if [[ -n "${{ inputs.baseline-file }}" ]]; then
+          ARGS+=(--baseline "${{ inputs.baseline-file }}")
+        fi
+
+        if [[ "${{ inputs.fail-on-new }}" == "true" ]]; then
+          ARGS+=(--fail-on-new)
+        fi
+
+        if [[ "${{ inputs.validate-hints }}" == "true" ]]; then
+          ARGS+=(--validate-hints)
+        fi
+
+        if [[ -n "${{ inputs.profile }}" ]]; then
+          IFS=',' read -r -a PROFILES <<< "${{ inputs.profile }}"
           for p in "${PROFILES[@]}"; do
-            ARGS="$ARGS --profile $(echo $p | xargs)"
+            p="$(trim "$p")"
+            if [[ -n "$p" ]]; then
+              ARGS+=(--profile "$p")
+            fi
           done
         fi
 
         # Human-readable output
-        openclaw-skill-deps $ARGS
+        openclaw-skill-deps "${ARGS[@]}"
         EXIT_CODE=$?
 
         # JSON output for downstream steps
-        JSON=$(openclaw-skill-deps $ARGS --json 2>/dev/null || true)
+        JSON=$(openclaw-skill-deps "${ARGS[@]}" --json 2>/dev/null || true)
         echo "json_report<<FINDINGS_EOF" >> $GITHUB_OUTPUT
         echo "$JSON" >> $GITHUB_OUTPUT
         echo "FINDINGS_EOF" >> $GITHUB_OUTPUT

@@ -35,15 +35,16 @@ def run_check(
         check_playwright_libs,
         check_project_presets,
         check_projects_recursive,
+        detect_playwright_runtime_need,
         scan_skills,
     )
     from .hints import init_hint_db
-    from .plugins import run_plugins
+    from .plugins import plugin_api_version, run_plugins
     from .profiles import check_profile
     from .versions import check_bin_versions
 
     override = Path(hints_file) if hints_file else None
-    init_hint_db(override)
+    db = init_hint_db(override)
 
     ctx = CheckContext(
         skills_dir=Path(skills_dir),
@@ -51,16 +52,36 @@ def run_check(
         probe=probe,
         profiles=profiles or [],
         recursive=recursive,
+        plugin_api_version=plugin_api_version(),
     )
 
     bins, installs, bin_specs = scan_skills(ctx.skills_dir)
+    playwright_reasons = detect_playwright_runtime_need(
+        skills_dir=ctx.skills_dir,
+        check_dir=ctx.check_dir,
+        profiles=ctx.profiles,
+    )
 
     findings: list[Finding] = []
+    for err in db.validation_errors:
+        findings.append(
+            Finding(
+                kind="hints_schema_warning",
+                item=str(override) if override else "builtin:hints.yaml",
+                detail=err,
+                severity="warn",
+                code="HINTS_SCHEMA_INVALID",
+                confidence="high",
+            )
+        )
     findings += check_bins(bins)
     findings += check_bin_versions(bin_specs)
     findings += check_install_arrays(installs)
     findings += check_fonts()
-    findings += check_playwright_libs()
+    findings += check_playwright_libs(
+        enabled=bool(playwright_reasons),
+        reason="; ".join(playwright_reasons),
+    )
 
     if ctx.check_dir:
         if ctx.recursive:

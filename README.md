@@ -81,6 +81,24 @@ JSON output (good for CI):
 openclaw-skill-deps --skills-dir /path/to/workspace/skills --json
 ```
 
+Write a reproducible environment snapshot:
+
+```bash
+openclaw-skill-deps --skills-dir /path/to/workspace/skills --snapshot .openclaw/snapshot.json
+```
+
+Compare against a baseline and gate new issues:
+
+```bash
+openclaw-skill-deps --skills-dir /path/to/workspace/skills --baseline .openclaw/baseline.json --fail-on-new
+```
+
+Validate hints schema (built-in + optional overrides):
+
+```bash
+openclaw-skill-deps --skills-dir /path/to/workspace/skills --validate-hints
+```
+
 ---
 
 ## 🧾 Output
@@ -88,6 +106,33 @@ openclaw-skill-deps --skills-dir /path/to/workspace/skills --json
 - ❌ Missing shared libraries (best-effort)
 - ❌ Missing fonts (CJK PDF export)
 - ✅ Clear next-step “Fix:” hints
+
+JSON mode (`--json`) emits one object per finding with this stable schema:
+
+- `kind`: finding category
+- `item`: dependency identifier
+- `detail`: human-readable diagnosis
+- `fix`: suggested remediation command/text (nullable)
+- `severity`: `error | warn | info`
+- `code`: optional machine-friendly reason code
+- `evidence`: optional probe evidence snippet
+- `confidence`: optional confidence level (`high | medium | low`)
+
+Snapshot mode (`--snapshot`) writes a JSON envelope with:
+
+- `schema_version`, `created_at_utc`
+- `environment` (OS family/platform/Python version)
+- `inputs` (CLI parameters used for this run)
+- `findings` (same finding objects as `--json`)
+- Optional `baseline` comparison result (`new_findings_count`, `new_findings`)
+
+Hints schema is versioned via top-level `schema_version` in `hints.yaml`.
+Current expected version: `1`.
+
+Plugin contract:
+
+- Checker plugins must return `list[Finding]`
+- `CheckContext.plugin_api_version` indicates the plugin API version (current: `1`)
 
 ---
 

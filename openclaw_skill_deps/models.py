@@ -11,6 +11,9 @@ class Finding:
     detail: str
     fix: str | None = None
     severity: str = "error"  # "error" | "warn" | "info"
+    code: str | None = None
+    evidence: str | None = None
+    confidence: str | None = None  # "high" | "medium" | "low"
 
 
 @dataclass
@@ -22,3 +25,4 @@ class CheckContext:
     probe: bool = False
     profiles: list[str] = field(default_factory=list)
     recursive: bool = False
+    plugin_api_version: int = 1
