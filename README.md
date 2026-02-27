@@ -2,158 +2,268 @@
 
 <div align="center">
 
-**🩺 A skill-level dependency doctor for OpenClaw**
+**🩺 Skill-level dependency doctor for OpenClaw**
 
-Catch missing binaries / system libs / fonts *before* a skill fails at runtime.
+Catch missing binaries, system libraries, fonts, and version mismatches *before* a skill fails at runtime.
 
 [![ci](https://github.com/RangeKing/openclaw-skill-deps/actions/workflows/ci.yml/badge.svg)](https://github.com/RangeKing/openclaw-skill-deps/actions/workflows/ci.yml)
 
-**🌐 Languages / 语言：**
-[English](README.md) · [简体中文](README.zh-CN.md)
+**🌐 Languages:** [English](README.md) | [简体中文](README.zh-CN.md)
 
 </div>
 
 ---
 
-## ✨ Why this exists (the pain point)
-OpenClaw has `doctor` for gateway/config health, but **skill execution** often fails later for reasons that are hard to predict from chat:
+## ✨ Why this exists
 
-- 🧱 **Missing OS libraries** (e.g. Playwright/Chromium deps like `libnspr4`, `libnss3`)
-- 🔤 **Missing fonts** (CJK PDF export shows tofu/□ without Noto CJK)
-- 🧪 **Missing binaries** (`pandoc`, `ffmpeg`, `uv`, `node`, …)
-- 📦 Project-local deps missing (npm / pip packages inside a deck/project)
+OpenClaw's built-in `doctor` command checks gateway connectivity, config validity, and service health — infrastructure-level concerns. But **skill execution** frequently fails for an entirely different class of reasons:
 
-These failures waste cycles and produce error logs that are not actionable for most users.
+| Failure class | Example | `doctor` catches it? |
+|---|---|:---:|
+| 🧱 Missing OS shared libraries | Playwright/Chromium needs `libnspr4`, `libnss3` | No |
+| 🔤 Missing fonts | CJK PDF export renders tofu (□) without Noto CJK | No |
+| 🧪 Missing binaries | `ffmpeg`, `pandoc`, `node`, `pdflatex` not in PATH | No |
+| 📌 Binary version too old | Skill requires `node>=18`, host has `node 16` | No |
+| 📦 Missing project-local deps | npm/pip packages that imply system-level deps | No |
+| 🔗 Transitive native deps | `playwright` → Chromium → 13 shared `.so` libs | No |
+
+**openclaw-skill-deps** fills this gap. It is a **deterministic, offline, pre-flight check** that operates at the *skill* layer — complementary to `doctor`, not a replacement.
+
+### 📋 How it differs from `openclaw doctor`
+
+| | `openclaw doctor` | `openclaw-skill-deps` |
+|---|---|---|
+| **Scope** | Gateway, config, services | Skill runtime dependencies |
+| **Granularity** | System-wide | Per-skill (`SKILL.md` metadata) |
+| **Checks** | Network, auth, service ports | Binaries, libs, fonts, versions |
+| **Version awareness** | No | Yes (`node>=18`, `python3>=3.10`) |
+| **Fix generation** | No | Yes (`--fix` generates bash/PowerShell) |
+| **Cross-platform matrix** | No | Yes (`--platform-matrix` for Linux/macOS/Windows) |
+| **Dependency graph** | No | Yes (`--graph tree` / `--graph dot`) |
+| **CI regression gating** | No | Yes (`--baseline --fail-on-new`) |
+| **Plugin system** | No | Yes (entry-point-based third-party checkers) |
+| **Monorepo support** | No | Yes (`--recursive` for nested projects) |
 
 ---
 
-## 🎯 What it does
-A **deterministic, offline** preflight check that:
+## 🎯 Features
 
-- 🔎 Scans installed skills (`skills/*/SKILL.md`) for declared `requires.bins`
-- ✅ Checks whether required binaries exist in `$PATH`
-- 🧩 Best-effort checks common runtime deps:
-  - shared libraries (via `ldconfig` when available)
-  - fonts (via `fc-list`)
-- 🧾 Prints **copy/paste fixes** (e.g. `apt-get install ...`)
-- 🤖 Optional `--json` output for CI/automation
+### 🔍 Core checks
+- 🔎 Scan `skills/*/SKILL.md` for declared `requires.bins` and validate presence in `$PATH`
+- 📌 **Version checking** — `node>=18` syntax: probes actual version and compares
+- 🔤 Font detection via `fc-list` (CJK fonts for PDF export)
+- 🧩 Shared library detection via `ldconfig` (Playwright/Chromium deps)
+- 🔗 Transitive dependency discovery (e.g., `playwright` → 13 native `.so` libraries)
+- 🎚️ Smart Playwright gating — only checks Chromium libs when skills/projects actually need them
 
-> This project intentionally **does not overlap** with existing browser relay plugins or web automation projects.
-> It focuses on *dependency hygiene* at the skill layer.
+### 🧾 Actionable output
+- 📋 Copy-paste fix suggestions per platform (apt/brew/choco)
+- 🔧 `--fix` generates a runnable bash/PowerShell repair script
+- 📊 `--platform-matrix` shows a cross-platform fix table (Linux / macOS / Windows)
+- 🔄 Auto-adapts `apt` commands to the host's package manager (dnf / yum / apk / pacman)
+
+### 🚀 Advanced
+- 🗺️ **Dependency graph**: `--graph tree` (text) or `--graph dot` (Graphviz)
+- 📌 **Version-aware bins**: `bins: ["node>=18", "python3>=3.10", "ffmpeg"]`
+- 📦 **Dependency profiles**: `--profile slidev`, `--profile whisper`, `--profile pdf-export`
+- 📸 **Environment snapshots**: `--snapshot report.json` for reproducible diagnostics
+- 🚦 **Baseline regression gating**: `--baseline old.json --fail-on-new` (exit 3 on new issues)
+- ✅ **Hints schema validation**: `--validate-hints` verifies the merged YAML config
+- 🔌 **Plugin contract validation**: `--validate-plugins` checks third-party checker signatures
+- 📁 **Monorepo recursive scan**: `--recursive` discovers nested sub-projects
+
+### 🔗 Ecosystem integration
+- 🐍 **Programmatic API**: `from openclaw_skill_deps import run_check`
+- 🔌 **Plugin system**: register custom checkers via Python entry points
+- 🪝 **Pre-commit hook**: `.pre-commit-hooks.yaml` included
+- ⚡ **GitHub Action**: `action.yml` with snapshot, baseline, and validation support
+- 🔄 **Hints migration**: `scripts/migrate_hints_schema.py` for schema upgrades
 
 ---
 
-## 🚀 Install
-Editable install (recommended for dev):
+## 📥 Install
 
 ```bash
-pip install -e .
+pip install -e .           # Editable (dev)
+pip install -e ".[dev]"    # With pytest + mypy
 ```
 
 ---
 
 ## 🧪 Usage
-Basic check (scan skills):
+
+### Basic check
 
 ```bash
-openclaw-skill-deps --skills-dir /path/to/workspace/skills
+openclaw-skill-deps --skills-dir ./skills
 ```
 
-Scan a project directory for presets (Node/Python/Dockerfile):
+### 📂 Scan a project directory
 
 ```bash
-openclaw-skill-deps --skills-dir /path/to/workspace/skills --check-dir /path/to/project
+openclaw-skill-deps --skills-dir ./skills --check-dir ./my-project
 ```
 
-Enable lightweight probes (best-effort):
-
-- Detect Python Playwright (`pip install playwright`)
-- Detect Node Playwright (`node_modules/.bin/playwright`)
-- (If Node Playwright exists) run a **Chromium headless launch smoke test**
+### 📁 Recursive monorepo scan
 
 ```bash
-openclaw-skill-deps --skills-dir /path/to/workspace/skills --check-dir /path/to/project --probe
+openclaw-skill-deps --skills-dir ./skills --check-dir ./monorepo --recursive
 ```
 
-JSON output (good for CI):
+### 📦 Use a dependency profile
 
 ```bash
-openclaw-skill-deps --skills-dir /path/to/workspace/skills --json
+openclaw-skill-deps --skills-dir ./skills --profile slidev --profile pdf-export
+openclaw-skill-deps --skills-dir ./skills --list-profiles
 ```
 
-Write a reproducible environment snapshot:
+### 🔧 Generate fix script
 
 ```bash
-openclaw-skill-deps --skills-dir /path/to/workspace/skills --snapshot .openclaw/snapshot.json
+openclaw-skill-deps --skills-dir ./skills --fix > fix.sh
+bash fix.sh  # review first!
 ```
 
-Compare against a baseline and gate new issues:
+### 🗺️ Dependency graph
 
 ```bash
-openclaw-skill-deps --skills-dir /path/to/workspace/skills --baseline .openclaw/baseline.json --fail-on-new
+openclaw-skill-deps --skills-dir ./skills --graph tree
+openclaw-skill-deps --skills-dir ./skills --graph dot | dot -Tsvg -o deps.svg
 ```
 
-Validate hints schema (built-in + optional overrides):
+### 📊 Cross-platform fix matrix
 
 ```bash
-openclaw-skill-deps --skills-dir /path/to/workspace/skills --validate-hints
+openclaw-skill-deps --skills-dir ./skills --platform-matrix
 ```
 
-Validate plugin contracts (entry-point loading + callable signature):
-
-```bash
-openclaw-skill-deps --skills-dir /path/to/workspace/skills --validate-plugins
+Output:
+```
++---------+------------------------------------+-------------------+--------------------+
+| Item    | Linux                              | macOS             | Windows            |
++---------+------------------------------------+-------------------+--------------------+
+| node    | Install Node.js (>=18) and npm     | brew install node | choco install ...  |
+| ffmpeg  | sudo apt-get install -y ffmpeg     | brew install ...  | choco install ...  |
++---------+------------------------------------+-------------------+--------------------+
 ```
 
-Migrate old hints YAML to schema v1:
+### 🤖 CI: JSON output + snapshot + baseline
 
 ```bash
-python scripts/migrate_hints_schema.py --in path/to/hints.yaml --out path/to/hints.v1.yaml
+# Save a baseline
+openclaw-skill-deps --skills-dir ./skills --json --snapshot baseline.json
+
+# On next run, fail if new issues appeared
+openclaw-skill-deps --skills-dir ./skills --baseline baseline.json --fail-on-new
+# Exit 0 = pass, 2 = errors, 3 = new findings vs baseline
+```
+
+### ✅ Validate hints & plugins
+
+```bash
+openclaw-skill-deps --skills-dir ./skills --validate-hints
+openclaw-skill-deps --skills-dir ./skills --validate-plugins
+```
+
+### 🐍 Programmatic API
+
+```python
+from openclaw_skill_deps import run_check
+
+findings = run_check("./skills", check_dir=".", profiles=["slidev"])
+errors = [f for f in findings if f.severity == "error"]
 ```
 
 ---
 
-## 🧾 Output
-- ❌ Missing binaries (with suggested install commands)
-- ❌ Missing shared libraries (best-effort)
-- ❌ Missing fonts (CJK PDF export)
-- ✅ Clear next-step “Fix:” hints
+## 📋 Finding schema
 
-JSON mode (`--json`) emits one object per finding with this stable schema:
+Each finding (in `--json` output) has:
 
-- `kind`: finding category
-- `item`: dependency identifier
-- `detail`: human-readable diagnosis
-- `fix`: suggested remediation command/text (nullable)
-- `severity`: `error | warn | info`
-- `code`: optional machine-friendly reason code
-- `evidence`: optional probe evidence snippet
-- `confidence`: optional confidence level (`high | medium | low`)
-
-Snapshot mode (`--snapshot`) writes a JSON envelope with:
-
-- `schema_version`, `created_at_utc`
-- `environment` (OS family/platform/Python version)
-- `inputs` (CLI parameters used for this run)
-- `findings` (same finding objects as `--json`)
-- Optional `baseline` comparison result (`new_findings_count`, `new_findings`)
-
-Hints schema is versioned via top-level `schema_version` in `hints.yaml`.
-Current expected version: `1`.
-
-Plugin contract:
-
-- Checker plugins must return `list[Finding]`
-- `CheckContext.plugin_api_version` indicates the plugin API version (current: `1`)
+| Field | Type | Description |
+|---|---|---|
+| `kind` | string | Finding category (e.g. `missing_bin`, `version_mismatch`) |
+| `item` | string | Dependency identifier |
+| `detail` | string | Human-readable diagnosis |
+| `fix` | string? | Suggested fix command/text |
+| `severity` | string | `error` \| `warn` \| `info` |
+| `code` | string? | Machine-readable reason code (e.g. `MISSING_BIN`) |
+| `evidence` | string? | Probe evidence snippet |
+| `confidence` | string? | `high` \| `medium` \| `low` |
 
 ---
 
-## 🗺️ Roadmap
-- Detect Playwright presence and run a lightweight `chromium --version` probe (best-effort)
-- Add per-skill “dependency profiles” for common stacks (Slidev, Whisper, PDF tooling)
-- Add `--fix` (generate a script), without auto-running privileged installs
+## ⚡ GitHub Action
+
+```yaml
+- uses: RangeKing/openclaw-skill-deps@v0.1.0
+  with:
+    skills-dir: ./skills
+    check-dir: .
+    profile: slidev,pdf-export
+    recursive: true
+    snapshot-file: .openclaw/snapshot.json
+    baseline-file: .openclaw/baseline.json
+    fail-on-new: true
+```
+
+## 🪝 Pre-commit hook
+
+```yaml
+# .pre-commit-config.yaml
+- repo: https://github.com/RangeKing/openclaw-skill-deps
+  rev: v0.1.0
+  hooks:
+    - id: openclaw-skill-deps
+      args: [--skills-dir, ./skills, --check-dir, .]
+```
+
+## 🔌 Plugin system
+
+Third-party checkers register via entry points:
+
+```toml
+# pyproject.toml of your plugin package
+[project.entry-points."openclaw_skill_deps.checkers"]
+gpu_checker = "my_plugin:check_gpu"
+```
+
+Plugin signature:
+
+```python
+from openclaw_skill_deps.models import CheckContext, Finding
+
+def check_gpu(ctx: CheckContext) -> list[Finding]:
+    ...
+```
+
+---
+
+## 🏗️ Architecture
+
+```
+openclaw_skill_deps/
+├── __init__.py       # Programmatic API (run_check)
+├── models.py         # Finding, CheckContext
+├── schemas.py        # Schema version constants + validation
+├── parsers.py        # SKILL.md frontmatter parsing
+├── scanners.py       # Project directory scanning + monorepo discovery
+├── hints.py          # HintDB (YAML-backed hints, pkg manager adaptation)
+├── checkers.py       # All check functions + Playwright detection
+├── versions.py       # Version spec parsing, probing, comparison
+├── profiles.py       # Dependency profile system
+├── plugins.py        # Entry-point plugin loading + contract validation
+├── fix_gen.py        # Fix script generation (bash/PowerShell)
+├── graph.py          # Dependency graph + platform matrix rendering
+├── snapshot.py       # Environment snapshot + baseline comparison
+├── migration.py      # Hints schema migration
+├── cli.py            # CLI entry point
+└── data/
+    └── hints.yaml    # Community-editable hint database (schema v1)
+```
 
 ---
 
 ## 📄 License
+
 MIT

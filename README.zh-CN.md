@@ -2,158 +2,268 @@
 
 <div align="center">
 
-**🩺 OpenClaw 的 Skill 依赖体检器（技能级 Doctor）**
+**🩺 OpenClaw 的 Skill 级依赖体检器**
 
-在 skill 真正执行失败之前，提前发现：缺二进制 / 缺系统库 / 缺字体。
+在 skill 运行失败之前，提前发现：缺二进制、缺系统库、缺字体、版本不对。
 
 [![ci](https://github.com/RangeKing/openclaw-skill-deps/actions/workflows/ci.yml/badge.svg)](https://github.com/RangeKing/openclaw-skill-deps/actions/workflows/ci.yml)
 
-**🌐 语言 / Languages：**
-[English](README.md) · [简体中文](README.zh-CN.md)
+**🌐 语言：** [English](README.md) | [简体中文](README.zh-CN.md)
 
 </div>
 
 ---
 
-## ✨ 为什么需要它（痛点）
-OpenClaw 有 `doctor` 用来检查网关/配置健康，但在实际使用中，**skill 的执行**经常会在最后一步才失败，常见原因是：
+## ✨ 为什么需要它
 
-- 🧱 **缺系统库**（例如 Playwright/Chromium 运行库：`libnspr4`、`libnss3`）
-- 🔤 **缺字体**（导出 PDF 时中文变“口口口/□”，常见是缺 Noto CJK）
-- 🧪 **缺二进制**（`pandoc`、`ffmpeg`、`uv`、`node` 等）
-- 📦 工程目录里缺 npm/pip 依赖（deck/project 本地依赖没装）
+OpenClaw 内置的 `doctor` 命令检查的是网关连接、配置合法性、服务状态——属于**基础设施级**的健康检查。但 **skill 实际执行**时，经常因为完全不同的原因失败：
 
-这类问题对用户来说往往是“看不懂的错误堆栈”，会大量浪费排查时间。
+| 失败类型 | 示例 | `doctor` 能发现？ |
+|---|---|:---:|
+| 🧱 缺系统共享库 | Playwright/Chromium 需要 `libnspr4`、`libnss3` | 否 |
+| 🔤 缺字体 | 导出 PDF 时中文变"□□□"（缺 Noto CJK 字体） | 否 |
+| 🧪 缺二进制 | `ffmpeg`、`pandoc`、`node`、`pdflatex` 不在 PATH | 否 |
+| 📌 二进制版本太旧 | Skill 要求 `node>=18`，系统装的是 `node 16` | 否 |
+| 📦 缺工程级依赖 | npm/pip 包暗含的系统原生依赖 | 否 |
+| 🔗 传递原生依赖 | `playwright` → Chromium → 13 个 `.so` 共享库 | 否 |
+
+**openclaw-skill-deps** 填补的正是这个空白。它是一个**确定性、离线、预检**工具，工作在 *skill 层*——是 `doctor` 的补充，而非替代。
+
+### 📋 与 `openclaw doctor` 的对比
+
+| | `openclaw doctor` | `openclaw-skill-deps` |
+|---|---|---|
+| **作用域** | 网关、配置、服务 | Skill 运行时依赖 |
+| **粒度** | 系统级 | 单个 Skill（基于 `SKILL.md` 元数据） |
+| **检查内容** | 网络、认证、端口 | 二进制、库、字体、版本 |
+| **版本感知** | 无 | 有（`node>=18`、`python3>=3.10`） |
+| **生成修复脚本** | 无 | 有（`--fix` 生成 bash/PowerShell） |
+| **跨平台矩阵** | 无 | 有（`--platform-matrix` 一次看齐三平台） |
+| **依赖图** | 无 | 有（`--graph tree` / `--graph dot`） |
+| **CI 回归门禁** | 无 | 有（`--baseline --fail-on-new`） |
+| **插件系统** | 无 | 有（entry-point 第三方 checker） |
+| **Monorepo 支持** | 无 | 有（`--recursive` 递归扫描子项目） |
 
 ---
 
-## 🎯 它做什么
-一个**确定性、离线**的预检工具：
+## 🎯 功能一览
 
-- 🔎 扫描已安装 skills（`skills/*/SKILL.md`）里声明的 `requires.bins`
-- ✅ 检查这些 bin 是否在 `$PATH`
-- 🧩 尽力检查常见运行依赖：
-  - 共享库（尽力通过 `ldconfig`）
-  - 字体（通过 `fc-list`）
-- 🧾 输出可复制的修复建议（如 `apt-get install ...`）
-- 🤖 支持 `--json` 输出，方便 CI/自动化 gate
+### 🔍 核心检查
+- 🔎 扫描 `skills/*/SKILL.md` 中声明的 `requires.bins`，验证是否在 `$PATH`
+- 📌 **版本检查** — 支持 `node>=18` 语法，探测实际版本并比对
+- 🔤 通过 `fc-list` 检测字体（CJK PDF 导出场景）
+- 🧩 通过 `ldconfig` 检测共享库（Playwright/Chromium 依赖）
+- 🔗 传递依赖发现（如 `playwright` → 13 个原生 `.so` 库）
+- 🎚️ 智能 Playwright 门控 — 仅当 skill/项目真正需要时才检查 Chromium 库
 
-> 本项目刻意**不去做**浏览器接管、网页自动化、爬虫等能力，避免与现有知名插件/开源项目重叠。
-> 它只解决一个问题：**skill 依赖卫生（dependency hygiene）**。
+### 🧾 可操作的输出
+- 📋 每个平台的复制粘贴修复建议（apt / brew / choco）
+- 🔧 `--fix` 生成可执行的 bash/PowerShell 修复脚本
+- 📊 `--platform-matrix` 输出跨平台修复表格（Linux / macOS / Windows）
+- 🔄 自动适配宿主机的包管理器（dnf / yum / apk / pacman）
+
+### 🚀 高级能力
+- 🗺️ **依赖图**：`--graph tree`（文本树）或 `--graph dot`（Graphviz DOT 格式）
+- 📌 **版本约束**：`bins: ["node>=18", "python3>=3.10", "ffmpeg"]`
+- 📦 **依赖 profile**：`--profile slidev`、`--profile whisper`、`--profile pdf-export`
+- 📸 **环境快照**：`--snapshot report.json` 用于可复现诊断
+- 🚦 **Baseline 回归门禁**：`--baseline old.json --fail-on-new`（新增问题时 exit 3）
+- ✅ **Hints schema 校验**：`--validate-hints` 验证合并后的 YAML 配置
+- 🔌 **插件契约校验**：`--validate-plugins` 检查第三方 checker 签名
+- 📁 **Monorepo 递归扫描**：`--recursive` 自动发现嵌套子项目
+
+### 🔗 生态集成
+- 🐍 **编程 API**：`from openclaw_skill_deps import run_check`
+- 🔌 **插件系统**：通过 Python entry points 注册自定义 checker
+- 🪝 **Pre-commit hook**：内置 `.pre-commit-hooks.yaml`
+- ⚡ **GitHub Action**：`action.yml` 支持快照、baseline、校验
+- 🔄 **Hints 迁移工具**：`scripts/migrate_hints_schema.py` 用于 schema 升级
 
 ---
 
-## 🚀 安装
-开发/本地可编辑安装：
+## 📥 安装
 
 ```bash
-pip install -e .
+pip install -e .           # 可编辑安装（开发）
+pip install -e ".[dev]"    # 含 pytest + mypy
 ```
 
 ---
 
 ## 🧪 用法
-基础检查：
+
+### 基础检查
 
 ```bash
-openclaw-skill-deps --skills-dir /path/to/workspace/skills
+openclaw-skill-deps --skills-dir ./skills
 ```
 
-扫描工程目录预设（Node/Python/Dockerfile）：
+### 📂 扫描工程目录
 
 ```bash
-openclaw-skill-deps --skills-dir /path/to/workspace/skills --check-dir /path/to/project
+openclaw-skill-deps --skills-dir ./skills --check-dir ./my-project
 ```
 
-开启轻量探针（best-effort）：
-
-- 检测 Python Playwright（`pip install playwright`）
-- 检测 Node Playwright（`node_modules/.bin/playwright`）
-- （如果存在 Node Playwright）尝试进行一次 **Chromium 无头启动 smoke test**
+### 📁 Monorepo 递归扫描
 
 ```bash
-openclaw-skill-deps --skills-dir /path/to/workspace/skills --check-dir /path/to/project --probe
+openclaw-skill-deps --skills-dir ./skills --check-dir ./monorepo --recursive
 ```
 
-JSON 输出（CI 推荐）：
+### 📦 使用依赖 profile
 
 ```bash
-openclaw-skill-deps --skills-dir /path/to/workspace/skills --json
+openclaw-skill-deps --skills-dir ./skills --profile slidev --profile pdf-export
+openclaw-skill-deps --skills-dir ./skills --list-profiles
 ```
 
-写入可复现环境快照：
+### 🔧 生成修复脚本
 
 ```bash
-openclaw-skill-deps --skills-dir /path/to/workspace/skills --snapshot .openclaw/snapshot.json
+openclaw-skill-deps --skills-dir ./skills --fix > fix.sh
+bash fix.sh  # 请先审核！
 ```
 
-对比 baseline 并对新增问题做门禁：
+### 🗺️ 依赖图
 
 ```bash
-openclaw-skill-deps --skills-dir /path/to/workspace/skills --baseline .openclaw/baseline.json --fail-on-new
+openclaw-skill-deps --skills-dir ./skills --graph tree
+openclaw-skill-deps --skills-dir ./skills --graph dot | dot -Tsvg -o deps.svg
 ```
 
-校验 hints schema（内置 + 可选 override）：
+### 📊 跨平台修复矩阵
 
 ```bash
-openclaw-skill-deps --skills-dir /path/to/workspace/skills --validate-hints
+openclaw-skill-deps --skills-dir ./skills --platform-matrix
 ```
 
-校验插件契约（entry-point 加载 + 可调用签名）：
-
-```bash
-openclaw-skill-deps --skills-dir /path/to/workspace/skills --validate-plugins
+输出示例：
+```
++---------+------------------------------------+-------------------+--------------------+
+| Item    | Linux                              | macOS             | Windows            |
++---------+------------------------------------+-------------------+--------------------+
+| node    | Install Node.js (>=18) and npm     | brew install node | choco install ...  |
+| ffmpeg  | sudo apt-get install -y ffmpeg     | brew install ...  | choco install ...  |
++---------+------------------------------------+-------------------+--------------------+
 ```
 
-将旧 hints YAML 迁移到 v1 schema：
+### 🤖 CI：JSON 输出 + 快照 + Baseline
 
 ```bash
-python scripts/migrate_hints_schema.py --in path/to/hints.yaml --out path/to/hints.v1.yaml
+# 保存 baseline
+openclaw-skill-deps --skills-dir ./skills --json --snapshot baseline.json
+
+# 下次运行时，若出现新问题则失败
+openclaw-skill-deps --skills-dir ./skills --baseline baseline.json --fail-on-new
+# Exit 0 = 通过, 2 = 有错误, 3 = 相比 baseline 有新增问题
+```
+
+### ✅ 校验 hints 和插件
+
+```bash
+openclaw-skill-deps --skills-dir ./skills --validate-hints
+openclaw-skill-deps --skills-dir ./skills --validate-plugins
+```
+
+### 🐍 编程 API
+
+```python
+from openclaw_skill_deps import run_check
+
+findings = run_check("./skills", check_dir=".", profiles=["slidev"])
+errors = [f for f in findings if f.severity == "error"]
 ```
 
 ---
 
-## 🧾 输出内容
-- ❌ 缺失二进制（附修复建议）
-- ❌ 缺失共享库（best-effort）
-- ❌ 缺失字体（CJK PDF 导出）
-- ✅ 明确的“下一步怎么修”提示
+## 📋 Finding 字段规格
 
-JSON 模式（`--json`）每条告警输出一个对象，字段契约如下：
+每条 finding（`--json` 输出）包含：
 
-- `kind`：问题类型
-- `item`：依赖标识
-- `detail`：可读诊断信息
-- `fix`：修复建议命令/文本（可为空）
-- `severity`：`error | warn | info`
-- `code`：可选，机器可读原因码
-- `evidence`：可选，探针证据片段
-- `confidence`：可选，置信度（`high | medium | low`）
-
-快照模式（`--snapshot`）会写入一个 JSON 外层对象，包含：
-
-- `schema_version`、`created_at_utc`
-- `environment`（OS 家族 / 平台 / Python 版本）
-- `inputs`（本次运行使用的 CLI 参数）
-- `findings`（与 `--json` 相同的告警数组）
-- 可选 `baseline` 对比结果（`new_findings_count`、`new_findings`）
-
-`hints.yaml` 通过顶层 `schema_version` 做版本化管理。
-当前期望版本：`1`。
-
-插件契约：
-
-- Checker 插件必须返回 `list[Finding]`
-- `CheckContext.plugin_api_version` 表示插件 API 版本（当前：`1`）
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `kind` | string | 问题类别（如 `missing_bin`、`version_mismatch`） |
+| `item` | string | 依赖标识符 |
+| `detail` | string | 人类可读的诊断信息 |
+| `fix` | string? | 修复建议命令/文本 |
+| `severity` | string | `error` \| `warn` \| `info` |
+| `code` | string? | 机器可读原因码（如 `MISSING_BIN`） |
+| `evidence` | string? | 探针证据片段 |
+| `confidence` | string? | 置信度：`high` \| `medium` \| `low` |
 
 ---
 
-## 🗺️ Roadmap
-- 检测 Playwright/Chromium 并做轻量探针（best-effort）
-- 为常见 skill 栈提供“依赖模板”（Slidev / Whisper / PDF 等）
-- 增加 `--fix`：生成修复脚本（不自动执行 sudo）
+## ⚡ GitHub Action
+
+```yaml
+- uses: RangeKing/openclaw-skill-deps@v0.1.0
+  with:
+    skills-dir: ./skills
+    check-dir: .
+    profile: slidev,pdf-export
+    recursive: true
+    snapshot-file: .openclaw/snapshot.json
+    baseline-file: .openclaw/baseline.json
+    fail-on-new: true
+```
+
+## 🪝 Pre-commit Hook
+
+```yaml
+# .pre-commit-config.yaml
+- repo: https://github.com/RangeKing/openclaw-skill-deps
+  rev: v0.1.0
+  hooks:
+    - id: openclaw-skill-deps
+      args: [--skills-dir, ./skills, --check-dir, .]
+```
+
+## 🔌 插件系统
+
+第三方 checker 通过 entry points 注册：
+
+```toml
+# 你的插件包的 pyproject.toml
+[project.entry-points."openclaw_skill_deps.checkers"]
+gpu_checker = "my_plugin:check_gpu"
+```
+
+插件签名：
+
+```python
+from openclaw_skill_deps.models import CheckContext, Finding
+
+def check_gpu(ctx: CheckContext) -> list[Finding]:
+    ...
+```
+
+---
+
+## 🏗️ 项目架构
+
+```
+openclaw_skill_deps/
+├── __init__.py       # 编程 API (run_check)
+├── models.py         # Finding, CheckContext
+├── schemas.py        # Schema 版本常量 + 校验
+├── parsers.py        # SKILL.md frontmatter 解析
+├── scanners.py       # 项目目录扫描 + monorepo 发现
+├── hints.py          # HintDB（YAML 驱动的提示数据库，包管理器适配）
+├── checkers.py       # 所有检查函数 + Playwright 智能检测
+├── versions.py       # 版本约束解析、探测、比较
+├── profiles.py       # 依赖 profile 系统
+├── plugins.py        # Entry-point 插件加载 + 契约校验
+├── fix_gen.py        # 修复脚本生成（bash/PowerShell）
+├── graph.py          # 依赖图 + 跨平台矩阵渲染
+├── snapshot.py       # 环境快照 + baseline 对比
+├── migration.py      # Hints schema 迁移
+├── cli.py            # CLI 入口
+└── data/
+    └── hints.yaml    # 社区可编辑的提示数据库（schema v1）
+```
 
 ---
 
 ## 📄 License
+
 MIT
