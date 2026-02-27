@@ -40,6 +40,10 @@ inputs:
     description: "Validate merged hints schema and exit early"
     required: false
     default: "false"
+  validate-plugins:
+    description: "Validate plugin entry-point contracts and exit early"
+    required: false
+    default: "false"
   python-version:
     description: "Python version to use"
     required: false
@@ -110,6 +114,10 @@ runs:
 
         if [[ "${{ inputs.validate-hints }}" == "true" ]]; then
           ARGS+=(--validate-hints)
+        fi
+
+        if [[ "${{ inputs.validate-plugins }}" == "true" ]]; then
+          ARGS+=(--validate-plugins)
         fi
 
         if [[ -n "${{ inputs.profile }}" ]]; then

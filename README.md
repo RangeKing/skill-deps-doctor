@@ -99,6 +99,18 @@ Validate hints schema (built-in + optional overrides):
 openclaw-skill-deps --skills-dir /path/to/workspace/skills --validate-hints
 ```
 
+Validate plugin contracts (entry-point loading + callable signature):
+
+```bash
+openclaw-skill-deps --skills-dir /path/to/workspace/skills --validate-plugins
+```
+
+Migrate old hints YAML to schema v1:
+
+```bash
+python scripts/migrate_hints_schema.py --in path/to/hints.yaml --out path/to/hints.v1.yaml
+```
+
 ---
 
 ## 🧾 Output

@@ -354,4 +354,42 @@ class TestValidateHintsFlag:
 
         assert rc == 2
         out = capsys.readouterr().out
-        assert "HINTS INVALID" in out
+        assert "VALIDATION FAILED" in out
+        assert "hints_schema_invalid" in out
+
+
+class TestValidatePluginsFlag:
+    @patch("openclaw_skill_deps.cli.validate_plugins_contract")
+    def test_validate_plugins_ok(self, mock_validate, tmp_path, capsys):
+        skills = tmp_path / "skills"
+        skills.mkdir()
+        mock_validate.return_value = []
+
+        with patch("sys.argv", ["prog", "--skills-dir", str(skills), "--validate-plugins"]):
+            rc = main()
+
+        assert rc == 0
+        out = capsys.readouterr().out
+        assert "VALIDATION OK" in out
+
+    @patch("openclaw_skill_deps.cli.validate_plugins_contract")
+    def test_validate_plugins_fail(self, mock_validate, tmp_path, capsys):
+        skills = tmp_path / "skills"
+        skills.mkdir()
+        from openclaw_skill_deps.models import Finding
+
+        mock_validate.return_value = [
+            Finding(
+                kind="plugin_contract_error",
+                item="bad",
+                detail="bad plugin",
+                severity="error",
+            )
+        ]
+
+        with patch("sys.argv", ["prog", "--skills-dir", str(skills), "--validate-plugins"]):
+            rc = main()
+
+        assert rc == 2
+        out = capsys.readouterr().out
+        assert "VALIDATION FAILED" in out

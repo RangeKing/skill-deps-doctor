@@ -5,7 +5,12 @@ import pytest
 
 from openclaw_skill_deps.hints import reset_hint_db
 from openclaw_skill_deps.models import CheckContext, Finding
-from openclaw_skill_deps.plugins import load_plugins, plugin_api_version, run_plugins
+from openclaw_skill_deps.plugins import (
+    load_plugins,
+    plugin_api_version,
+    run_plugins,
+    validate_plugins_contract,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -95,3 +100,46 @@ class TestRunPlugins:
 class TestPluginVersion:
     def test_api_version_constant(self):
         assert plugin_api_version() == 1
+
+
+class _FakeEntryPoint:
+    def __init__(self, name: str, value: str, loader):
+        self.name = name
+        self.value = value
+        self._loader = loader
+
+    def load(self):
+        return self._loader()
+
+
+class TestValidatePluginsContract:
+    @patch("openclaw_skill_deps.plugins.importlib.metadata.entry_points", return_value=[])
+    def test_no_plugins_info(self, _mock_eps, tmp_path):
+        ctx = _make_ctx(tmp_path)
+        findings = validate_plugins_contract(ctx)
+        assert len(findings) == 1
+        assert findings[0].kind == "plugin_validation_info"
+        assert findings[0].severity == "info"
+
+    @patch("openclaw_skill_deps.plugins.importlib.metadata.entry_points")
+    def test_bad_signature(self, mock_eps, tmp_path):
+        def bad_plugin() -> list[Finding]:
+            return []
+
+        mock_eps.return_value = [_FakeEntryPoint("bad", "pkg:bad", lambda: bad_plugin)]
+        ctx = _make_ctx(tmp_path)
+        findings = validate_plugins_contract(ctx)
+        assert any(f.kind == "plugin_contract_error" for f in findings)
+        assert any(f.code == "PLUGIN_SIGNATURE_INVALID" for f in findings)
+
+    @patch("openclaw_skill_deps.plugins.importlib.metadata.entry_points")
+    def test_valid_plugin_contract(self, mock_eps, tmp_path):
+        def ok_plugin(ctx: CheckContext) -> list[Finding]:
+            return []
+
+        mock_eps.return_value = [_FakeEntryPoint("ok", "pkg:ok", lambda: ok_plugin)]
+        ctx = _make_ctx(tmp_path)
+        findings = validate_plugins_contract(ctx)
+        assert len(findings) == 1
+        assert findings[0].kind == "plugin_validation_info"
+        assert findings[0].code == "PLUGIN_CONTRACT_OK"

@@ -20,7 +20,7 @@ from .fix_gen import generate_fix_script
 from .graph import build_graph, render_dot, render_platform_matrix, render_tree
 from .hints import get_hint_db, init_hint_db, os_family
 from .models import CheckContext, Finding
-from .plugins import plugin_api_version, run_plugins
+from .plugins import plugin_api_version, run_plugins, validate_plugins_contract
 from .profiles import check_profile, list_profiles
 from .snapshot import (
     build_snapshot,
@@ -110,6 +110,11 @@ def main() -> int:
         help="Validate merged hints schema (built-in + --hints-file) and exit",
     )
     ap.add_argument(
+        "--validate-plugins",
+        action="store_true",
+        help="Validate plugin entry-point contracts and exit",
+    )
+    ap.add_argument(
         "--snapshot",
         default=None,
         metavar="PATH",
@@ -137,23 +142,64 @@ def main() -> int:
 
     ap.add_argument("--json", dest="json_output", action="store_true")
     args = ap.parse_args()
+    skills_dir = Path(args.skills_dir)
 
     # -- initialise hint DB ------------------------------------------------
     override = Path(args.hints_file) if args.hints_file else None
     db = init_hint_db(override)
 
-    if args.validate_hints:
-        errs = db.validation_errors
-        if errs:
-            print("HINTS INVALID:")
-            for e in errs:
-                print(f"  - {e}")
-            return 2
-        print(
-            f"HINTS OK (schema_version={db.schema_version}, "
-            f"expected={db.expected_schema_version})"
-        )
-        return 0
+    if args.validate_hints or args.validate_plugins:
+        validation_findings: list[Finding] = []
+
+        if args.validate_hints:
+            errs = db.validation_errors
+            if errs:
+                for e in errs:
+                    validation_findings.append(
+                        Finding(
+                            kind="hints_schema_invalid",
+                            item=str(override) if override else "builtin:hints.yaml",
+                            detail=e,
+                            severity="error",
+                            code="HINTS_SCHEMA_INVALID",
+                            confidence="high",
+                        )
+                    )
+            else:
+                validation_findings.append(
+                    Finding(
+                        kind="hints_validation_info",
+                        item=str(override) if override else "builtin:hints.yaml",
+                        detail=(
+                            f"HINTS OK (schema_version={db.schema_version}, "
+                            f"expected={db.expected_schema_version})"
+                        ),
+                        severity="info",
+                        code="HINTS_SCHEMA_OK",
+                        confidence="high",
+                    )
+                )
+
+        if args.validate_plugins:
+            vctx = CheckContext(
+                skills_dir=skills_dir,
+                check_dir=Path(args.check_dir) if args.check_dir else None,
+                probe=args.probe,
+                profiles=args.profile,
+                recursive=args.recursive,
+                plugin_api_version=plugin_api_version(),
+            )
+            validation_findings.extend(validate_plugins_contract(vctx))
+
+        issues = [f for f in validation_findings if f.severity in {"warn", "error"}]
+        if issues:
+            print("VALIDATION FAILED:")
+        else:
+            print("VALIDATION OK")
+        for f in validation_findings:
+            icon = _SEVERITY_ICON.get(f.severity, "\u2022")
+            print(f"  {icon} [{f.kind}] {f.item}: {f.detail}")
+        return 2 if issues else 0
 
     # -- list-profiles (early exit) ----------------------------------------
     if args.list_profiles:
@@ -167,7 +213,6 @@ def main() -> int:
         return 0
 
     # -- graph mode (early exit) -------------------------------------------
-    skills_dir = Path(args.skills_dir)
     if args.graph:
         check_path = Path(args.check_dir) if args.check_dir else None
         roots = build_graph(skills_dir, check_path)

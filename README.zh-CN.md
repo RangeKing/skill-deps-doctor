@@ -99,6 +99,18 @@ openclaw-skill-deps --skills-dir /path/to/workspace/skills --baseline .openclaw/
 openclaw-skill-deps --skills-dir /path/to/workspace/skills --validate-hints
 ```
 
+校验插件契约（entry-point 加载 + 可调用签名）：
+
+```bash
+openclaw-skill-deps --skills-dir /path/to/workspace/skills --validate-plugins
+```
+
+将旧 hints YAML 迁移到 v1 schema：
+
+```bash
+python scripts/migrate_hints_schema.py --in path/to/hints.yaml --out path/to/hints.v1.yaml
+```
+
 ---
 
 ## 🧾 输出内容
