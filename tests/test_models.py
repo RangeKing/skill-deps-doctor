@@ -1,0 +1,50 @@
+from pathlib import Path
+
+from openclaw_skill_deps.models import CheckContext, Finding
+
+
+class TestFinding:
+    def test_defaults(self):
+        f = Finding(kind="missing_bin", item="node", detail="not found")
+        assert f.severity == "error"
+        assert f.fix is None
+
+    def test_custom_severity(self):
+        f = Finding(kind="info", item="x", detail="ok", severity="info")
+        assert f.severity == "info"
+
+    def test_with_fix(self):
+        f = Finding(kind="missing_bin", item="git", detail="nope", fix="apt install git")
+        assert f.fix == "apt install git"
+
+    def test_as_dict(self):
+        f = Finding(kind="k", item="i", detail="d", fix="f", severity="warn")
+        d = f.__dict__
+        assert d == {
+            "kind": "k",
+            "item": "i",
+            "detail": "d",
+            "fix": "f",
+            "severity": "warn",
+        }
+
+
+class TestCheckContext:
+    def test_defaults(self):
+        ctx = CheckContext(skills_dir=Path("/tmp/skills"))
+        assert ctx.check_dir is None
+        assert ctx.probe is False
+        assert ctx.profiles == []
+        assert ctx.recursive is False
+
+    def test_full(self):
+        ctx = CheckContext(
+            skills_dir=Path("/skills"),
+            check_dir=Path("/project"),
+            probe=True,
+            profiles=["slidev"],
+            recursive=True,
+        )
+        assert ctx.check_dir == Path("/project")
+        assert ctx.profiles == ["slidev"]
+        assert ctx.recursive is True

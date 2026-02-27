@@ -1,0 +1,96 @@
+name: "OpenClaw Skill Deps Doctor"
+description: "Preflight check for missing skill dependencies (binaries, libs, fonts)"
+branding:
+  icon: "check-circle"
+  color: "green"
+
+inputs:
+  skills-dir:
+    description: "Path to the skills directory"
+    required: true
+    default: "."
+  check-dir:
+    description: "Project directory to scan for presets (optional)"
+    required: false
+  profile:
+    description: "Dependency profile(s) to check, comma-separated (e.g. slidev,pdf-export)"
+    required: false
+  probe:
+    description: "Run lightweight runtime probes"
+    required: false
+    default: "false"
+  recursive:
+    description: "Recursively discover sub-projects under check-dir"
+    required: false
+    default: "false"
+  hints-file:
+    description: "Path to custom hints YAML override"
+    required: false
+  python-version:
+    description: "Python version to use"
+    required: false
+    default: "3.12"
+
+outputs:
+  exit-code:
+    description: "0 = pass, 2 = errors found"
+    value: ${{ steps.run.outputs.exit_code }}
+  json-report:
+    description: "JSON array of all findings"
+    value: ${{ steps.run.outputs.json_report }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install openclaw-skill-deps
+      shell: bash
+      run: pip install "${{ github.action_path }}"
+
+    - name: Run checks
+      id: run
+      shell: bash
+      run: |
+        set +e
+
+        ARGS="--skills-dir ${{ inputs.skills-dir }}"
+
+        if [ -n "${{ inputs.check-dir }}" ]; then
+          ARGS="$ARGS --check-dir ${{ inputs.check-dir }}"
+        fi
+
+        if [ "${{ inputs.recursive }}" = "true" ]; then
+          ARGS="$ARGS --recursive"
+        fi
+
+        if [ "${{ inputs.probe }}" = "true" ]; then
+          ARGS="$ARGS --probe"
+        fi
+
+        if [ -n "${{ inputs.hints-file }}" ]; then
+          ARGS="$ARGS --hints-file ${{ inputs.hints-file }}"
+        fi
+
+        if [ -n "${{ inputs.profile }}" ]; then
+          IFS=',' read -ra PROFILES <<< "${{ inputs.profile }}"
+          for p in "${PROFILES[@]}"; do
+            ARGS="$ARGS --profile $(echo $p | xargs)"
+          done
+        fi
+
+        # Human-readable output
+        openclaw-skill-deps $ARGS
+        EXIT_CODE=$?
+
+        # JSON output for downstream steps
+        JSON=$(openclaw-skill-deps $ARGS --json 2>/dev/null || true)
+        echo "json_report<<FINDINGS_EOF" >> $GITHUB_OUTPUT
+        echo "$JSON" >> $GITHUB_OUTPUT
+        echo "FINDINGS_EOF" >> $GITHUB_OUTPUT
+        echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+
+        exit $EXIT_CODE

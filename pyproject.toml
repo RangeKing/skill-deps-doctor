@@ -8,9 +8,36 @@ license = {text = "MIT"}
 authors = [{name="openclaw"}]
 dependencies = ["pyyaml>=6.0"]
 
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+dev = [
+    "openclaw-skill-deps[test]",
+    "mypy>=1.0",
+    "types-PyYAML>=6.0",
+]
+
 [project.scripts]
 openclaw-skill-deps = "openclaw_skill_deps.cli:main"
+
+[project.entry-points."openclaw_skill_deps.checkers"]
+# Third-party plugins register here. Example:
+# my_gpu_checker = "my_plugin:check_gpu"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-data]
+openclaw_skill_deps = ["data/*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
