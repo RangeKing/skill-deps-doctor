@@ -6,7 +6,25 @@ requires-python = ">=3.10"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name="openclaw"}]
+keywords = ["openclaw", "dependency", "doctor", "skill", "preflight"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: System :: Systems Administration",
+]
 dependencies = ["pyyaml>=6.0"]
+
+[project.urls]
+Homepage = "https://github.com/RangeKing/openclaw-skill-deps"
+Repository = "https://github.com/RangeKing/openclaw-skill-deps"
+Issues = "https://github.com/RangeKing/openclaw-skill-deps/issues"
 
 [project.optional-dependencies]
 test = [
@@ -21,6 +39,8 @@ dev = [
 
 [project.scripts]
 openclaw-skill-deps = "openclaw_skill_deps.cli:main"
+skill-deps-doctor = "openclaw_skill_deps.cli:main"
+skill-deps = "openclaw_skill_deps.cli:main"
 
 [project.entry-points."openclaw_skill_deps.checkers"]
 # Third-party plugins register here. Example:

@@ -30,10 +30,10 @@ jobs:
         run: pytest -v --tb=short
 
       - name: Smoke (help)
-        run: openclaw-skill-deps --help
+        run: skill-deps-doctor --help
 
       - name: Smoke (json output)
-        run: openclaw-skill-deps --skills-dir . --json || true
+        run: skill-deps-doctor --skills-dir . --json || true
 
   schema-contract:
     runs-on: ubuntu-latest
@@ -51,10 +51,10 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Validate hints schema
-        run: openclaw-skill-deps --skills-dir . --validate-hints
+        run: skill-deps-doctor --skills-dir . --validate-hints
 
       - name: Validate plugin contracts
-        run: openclaw-skill-deps --skills-dir . --validate-plugins
+        run: skill-deps-doctor --skills-dir . --validate-plugins
 
       - name: Verify hints migration is clean
         run: python scripts/migrate_hints_schema.py --in openclaw_skill_deps/data/hints.yaml --check

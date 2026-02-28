@@ -45,7 +45,7 @@ def _filter_by_verbosity(
 
 def main() -> int:
     ap = argparse.ArgumentParser(
-        prog="openclaw-skill-deps",
+        prog="skill-deps-doctor",
         description="Skill-level dependency doctor for OpenClaw",
     )
     ap.add_argument("--skills-dir", required=True)

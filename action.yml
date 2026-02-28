@@ -131,11 +131,11 @@ runs:
         fi
 
         # Human-readable output
-        openclaw-skill-deps "${ARGS[@]}"
+        skill-deps-doctor "${ARGS[@]}"
         EXIT_CODE=$?
 
         # JSON output for downstream steps
-        JSON=$(openclaw-skill-deps "${ARGS[@]}" --json 2>/dev/null || true)
+        JSON=$(skill-deps-doctor "${ARGS[@]}" --json 2>/dev/null || true)
         echo "json_report<<FINDINGS_EOF" >> $GITHUB_OUTPUT
         echo "$JSON" >> $GITHUB_OUTPUT
         echo "FINDINGS_EOF" >> $GITHUB_OUTPUT

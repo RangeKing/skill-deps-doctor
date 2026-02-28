@@ -7,3 +7,13 @@
   always_run: true
   args: [--skills-dir, .]
   stages: [pre-commit]
+
+- id: skill-deps-doctor
+  name: Check skill dependencies
+  description: Preflight check for missing binaries, libraries, and fonts required by skills
+  entry: skill-deps-doctor
+  language: python
+  pass_filenames: false
+  always_run: true
+  args: [--skills-dir, .]
+  stages: [pre-commit]

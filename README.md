@@ -27,11 +27,11 @@ OpenClaw's built-in `doctor` command checks gateway connectivity, config validit
 | 📦 Missing project-local deps | npm/pip packages that imply system-level deps | No |
 | 🔗 Transitive native deps | `playwright` → Chromium → 13 shared `.so` libs | No |
 
-**openclaw-skill-deps** fills this gap. It is a **deterministic, offline, pre-flight check** that operates at the *skill* layer — complementary to `doctor`, not a replacement.
+**skill-deps-doctor** (package: `openclaw-skill-deps`) fills this gap. It is a **deterministic, offline, pre-flight check** that operates at the *skill* layer — complementary to `doctor`, not a replacement.
 
 ### 📋 How it differs from `openclaw doctor`
 
-| | `openclaw doctor` | `openclaw-skill-deps` |
+| | `openclaw doctor` | `skill-deps-doctor` |
 |---|---|---|
 | **Scope** | Gateway, config, services | Skill runtime dependencies |
 | **Granularity** | System-wide | Per-skill (`SKILL.md` metadata) |
@@ -75,7 +75,7 @@ OpenClaw's built-in `doctor` command checks gateway connectivity, config validit
 ### 🔗 Ecosystem integration
 - 🐍 **Programmatic API**: `from openclaw_skill_deps import run_check`
 - 🔌 **Plugin system**: register custom checkers via Python entry points
-- 🪝 **Pre-commit hook**: `.pre-commit-hooks.yaml` included
+- 🪃 **Pre-commit hook**: `.pre-commit-hooks.yaml` included
 - ⚡ **GitHub Action**: `action.yml` with snapshot, baseline, and validation support
 - 🔄 **Hints migration**: `scripts/migrate_hints_schema.py` for schema upgrades
 
@@ -83,9 +83,21 @@ OpenClaw's built-in `doctor` command checks gateway connectivity, config validit
 
 ## 📥 Install
 
+From PyPI / ClawHub (recommended):
+
 ```bash
-pip install -e .           # Editable (dev)
-pip install -e ".[dev]"    # With pytest + mypy
+pip install openclaw-skill-deps
+```
+
+Primary CLI command: `skill-deps-doctor` (short alias: `skill-deps`).  
+Legacy command `openclaw-skill-deps` remains available for backward compatibility.
+
+For local development:
+
+```bash
+git clone https://github.com/RangeKing/openclaw-skill-deps.git
+cd openclaw-skill-deps
+pip install -e ".[dev]"    # Editable install with pytest + mypy
 ```
 
 ---
@@ -95,46 +107,46 @@ pip install -e ".[dev]"    # With pytest + mypy
 ### Basic check
 
 ```bash
-openclaw-skill-deps --skills-dir ./skills
+skill-deps-doctor --skills-dir ./skills
 ```
 
 ### 📂 Scan a project directory
 
 ```bash
-openclaw-skill-deps --skills-dir ./skills --check-dir ./my-project
+skill-deps-doctor --skills-dir ./skills --check-dir ./my-project
 ```
 
 ### 📁 Recursive monorepo scan
 
 ```bash
-openclaw-skill-deps --skills-dir ./skills --check-dir ./monorepo --recursive
+skill-deps-doctor --skills-dir ./skills --check-dir ./monorepo --recursive
 ```
 
 ### 📦 Use a dependency profile
 
 ```bash
-openclaw-skill-deps --skills-dir ./skills --profile slidev --profile pdf-export
-openclaw-skill-deps --skills-dir ./skills --list-profiles
+skill-deps-doctor --skills-dir ./skills --profile slidev --profile pdf-export
+skill-deps-doctor --skills-dir ./skills --list-profiles
 ```
 
 ### 🔧 Generate fix script
 
 ```bash
-openclaw-skill-deps --skills-dir ./skills --fix > fix.sh
+skill-deps-doctor --skills-dir ./skills --fix > fix.sh
 bash fix.sh  # review first!
 ```
 
 ### 🗺️ Dependency graph
 
 ```bash
-openclaw-skill-deps --skills-dir ./skills --graph tree
-openclaw-skill-deps --skills-dir ./skills --graph dot | dot -Tsvg -o deps.svg
+skill-deps-doctor --skills-dir ./skills --graph tree
+skill-deps-doctor --skills-dir ./skills --graph dot | dot -Tsvg -o deps.svg
 ```
 
 ### 📊 Cross-platform fix matrix
 
 ```bash
-openclaw-skill-deps --skills-dir ./skills --platform-matrix
+skill-deps-doctor --skills-dir ./skills --platform-matrix
 ```
 
 Output:
@@ -151,18 +163,18 @@ Output:
 
 ```bash
 # Save a baseline
-openclaw-skill-deps --skills-dir ./skills --json --snapshot baseline.json
+skill-deps-doctor --skills-dir ./skills --json --snapshot baseline.json
 
 # On next run, fail if new issues appeared
-openclaw-skill-deps --skills-dir ./skills --baseline baseline.json --fail-on-new
+skill-deps-doctor --skills-dir ./skills --baseline baseline.json --fail-on-new
 # Exit 0 = pass, 2 = errors, 3 = new findings vs baseline
 ```
 
 ### ✅ Validate hints & plugins
 
 ```bash
-openclaw-skill-deps --skills-dir ./skills --validate-hints
-openclaw-skill-deps --skills-dir ./skills --validate-plugins
+skill-deps-doctor --skills-dir ./skills --validate-hints
+skill-deps-doctor --skills-dir ./skills --validate-plugins
 ```
 
 ### 🐍 Programmatic API
@@ -207,14 +219,14 @@ Each finding (in `--json` output) has:
     fail-on-new: true
 ```
 
-## 🪝 Pre-commit hook
+## 🪃 Pre-commit hook
 
 ```yaml
 # .pre-commit-config.yaml
 - repo: https://github.com/RangeKing/openclaw-skill-deps
   rev: v0.1.0
   hooks:
-    - id: openclaw-skill-deps
+    - id: skill-deps-doctor
       args: [--skills-dir, ./skills, --check-dir, .]
 ```
 

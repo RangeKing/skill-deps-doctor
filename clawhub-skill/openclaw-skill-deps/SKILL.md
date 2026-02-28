@@ -1,43 +1,130 @@
 ---
 name: OpenClaw Skill Deps Doctor
-description: Skill-level dependency doctor for OpenClaw. Preflight check missing bins, Playwright/Chromium runtime, CJK fonts, and project presets (Node/Python/Dockerfile). Use before running skills to avoid runtime failures.
-metadata: {"clawdbot": {"emoji": "🧰", "requires": {"bins": ["python3"]}, "install": [{"id": "pyyaml", "kind": "pip", "package": "pyyaml", "label": "Install PyYAML for parsing SKILL.md frontmatter"}]}}
+description: "Skill-level dependency doctor for OpenClaw — preflight check for missing binaries, version mismatches, system libraries, CJK fonts, Playwright/Chromium runtime, and project-level deps. Complementary to `openclaw doctor`: it checks skill runtime deps that `doctor` cannot reach."
+metadata: {"clawdbot": {"emoji": "🧰", "requires": {"bins": ["python3", "skill-deps-doctor"]}, "install": [{"id": "skill-deps-doctor", "kind": "pip", "package": "openclaw-skill-deps", "bins": ["skill-deps-doctor"], "label": "Install skill-deps-doctor (package: openclaw-skill-deps) from PyPI"}]}}
 ---
 
 # 🧰 OpenClaw Skill Deps Doctor
 
-Use this skill to **detect missing dependencies before a skill fails**.
+> **Complementary to `openclaw doctor`** — `doctor` checks gateway/config/services;
+> this skill checks **skill runtime dependencies** (bins, versions, libs, fonts).
+
+Use this skill to **detect missing or broken dependencies before a skill fails at runtime**.
 
 ## What it checks
-- ✅ Binaries required by installed skills (`metadata.clawdbot.requires.bins`)
-- ✅ Skill `metadata.clawdbot.install` arrays (validates declared `bins` exist)
-- ✅ CJK fonts (prevents PDF tofu/□)
-- ✅ Playwright probes (Node + Python) + Chromium headless launch smoke test (best-effort)
-- ✅ Project presets via `--check-dir`:
-  - Node: `package.json`
-  - Python: `pyproject.toml` / `requirements.txt`
-  - Docker: `Dockerfile` (also extracts apt/apk packages for hints)
 
-## Install deps
-This skill requires PyYAML:
+- 🔎 **Binary presence** — scans `skills/*/SKILL.md` declared `requires.bins` against `$PATH`
+- 📌 **Version constraints** — `node>=18`, `python3>=3.10` syntax with actual version probing
+- 🧩 **Shared libraries** — Playwright/Chromium native deps via `ldconfig` (Linux)
+- 🔤 **CJK fonts** — prevents PDF tofu (□) via `fc-list`
+- 🔗 **Transitive native deps** — e.g. `playwright` → 13 `.so` libraries
+- 📦 **Project presets** via `--check-dir`:
+  - Node (`package.json`), Python (`pyproject.toml` / `requirements.txt`), Docker (`Dockerfile`)
+  - Cross-references npm/pip packages against system-dep hints
+- 🎚️ **Playwright probes** — Node + Python detection + Chromium headless launch smoke test
+- 📦 **Dependency profiles** — `--profile slidev`, `--profile whisper`, `--profile pdf-export`
+- 🔌 **Plugin system** — third-party checkers via Python entry points
+
+## Install
 
 ```bash
-pip install pyyaml
+pip install openclaw-skill-deps
 ```
 
-## Run
+Legacy command `openclaw-skill-deps` remains supported for compatibility.
+
+## Usage
+
+### Basic check
+
 ```bash
-python {baseDir}/scripts/openclaw-skill-deps.py \
-  --skills-dir /path/to/workspace/skills \
-  --check-dir /path/to/project \
-  --probe
+skill-deps-doctor --skills-dir /path/to/workspace/skills
 ```
 
-JSON output (for CI):
+### Scan a project directory (with probes)
+
 ```bash
-python {baseDir}/scripts/openclaw-skill-deps.py --skills-dir /path/to/workspace/skills --json
+skill-deps-doctor --skills-dir ./skills --check-dir ./project --probe
+```
+
+### Monorepo recursive scan
+
+```bash
+skill-deps-doctor --skills-dir ./skills --check-dir ./monorepo --recursive
+```
+
+### Dependency profiles
+
+```bash
+skill-deps-doctor --skills-dir ./skills --profile slidev --profile pdf-export
+skill-deps-doctor --skills-dir ./skills --list-profiles
+```
+
+### Generate fix script
+
+```bash
+skill-deps-doctor --skills-dir ./skills --fix > fix.sh
+```
+
+### Dependency graph
+
+```bash
+skill-deps-doctor --skills-dir ./skills --graph tree
+skill-deps-doctor --skills-dir ./skills --graph dot | dot -Tsvg -o deps.svg
+```
+
+### Cross-platform fix matrix
+
+```bash
+skill-deps-doctor --skills-dir ./skills --platform-matrix
+```
+
+### JSON output (CI)
+
+```bash
+skill-deps-doctor --skills-dir ./skills --json
+```
+
+### Environment snapshot + baseline regression gating
+
+```bash
+# Save baseline
+skill-deps-doctor --skills-dir ./skills --snapshot baseline.json
+
+# Gate on new issues
+skill-deps-doctor --skills-dir ./skills --baseline baseline.json --fail-on-new
+# Exit: 0 = pass, 2 = errors, 3 = new findings vs baseline
+```
+
+### Validate hints schema & plugin contracts
+
+```bash
+skill-deps-doctor --skills-dir ./skills --validate-hints
+skill-deps-doctor --skills-dir ./skills --validate-plugins
+```
+
+### Custom hints override
+
+```bash
+skill-deps-doctor --skills-dir ./skills --hints-file my-hints.yaml
+```
+
+### Verbosity
+
+```bash
+skill-deps-doctor --skills-dir ./skills -v        # Show all (including info)
+skill-deps-doctor --skills-dir ./skills -q        # Errors only
+skill-deps-doctor --skills-dir ./skills --no-plugins  # Skip third-party plugins
+```
+
+### Fallback wrapper (repo/dev layout)
+
+```bash
+python {baseDir}/scripts/openclaw-skill-deps.py --skills-dir ./skills
 ```
 
 ## Notes
-- Linux-only: shared-lib checks for Chromium runtime (via `ldconfig`).
-- macOS/Windows: Playwright checks rely on probes instead.
+
+- **Linux**: shared-lib checks via `ldconfig`; font checks via `fc-list`; auto-adapts `apt` hints to host package manager (dnf / yum / apk / pacman).
+- **macOS / Windows**: binary + version + font checks work; Playwright checks rely on probes (`--probe`).
+- **CI integration**: use `--json` for machine-readable output, `--snapshot` + `--baseline --fail-on-new` for regression gating.
