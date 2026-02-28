@@ -42,7 +42,7 @@ except Exception as e:
         "Fix options:\n"
         "  1) Ensure vendored code exists at: {baseDir}/vendor/skill_deps_doctor\n"
         "  2) Or install via pip: pip install skill-deps-doctor\n"
-        '  3) Or install via git: pip install "git+https://github.com/RangeKing/openclaw-skill-deps.git"\n'
+        '  3) Or install via git: pip install "git+https://github.com/RangeKing/skill-deps-doctor.git"\n'
         f"Import error: {e}"
     )
     print(msg, file=sys.stderr)
