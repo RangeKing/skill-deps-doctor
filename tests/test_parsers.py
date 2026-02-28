@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from openclaw_skill_deps.parsers import SkillMeta, parse_skill_md
+from skill_deps_doctor.parsers import SkillMeta, parse_skill_md
 
 
 def _write_skill(tmp_path: Path, content: str) -> Path:

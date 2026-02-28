@@ -2,11 +2,16 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 import yaml
 
-from openclaw_skill_deps.migration import migrate_hints_to_v1
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from skill_deps_doctor.migration import migrate_hints_to_v1
 
 
 def _load_yaml(path: Path) -> dict:
@@ -24,7 +29,7 @@ def _load_yaml(path: Path) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(
         prog="migrate_hints_schema.py",
-        description="Migrate openclaw-skill-deps hints YAML to schema v1",
+        description="Migrate skill-deps-doctor hints YAML to schema v1",
     )
     ap.add_argument("--in", dest="in_file", required=True, help="Input hints YAML path")
     ap.add_argument(

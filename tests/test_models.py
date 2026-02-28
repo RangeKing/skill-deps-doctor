@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from openclaw_skill_deps.models import CheckContext, Finding
+from skill_deps_doctor.models import CheckContext, Finding
 
 
 class TestFinding:

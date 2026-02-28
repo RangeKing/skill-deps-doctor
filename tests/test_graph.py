@@ -3,15 +3,15 @@ from unittest.mock import patch
 
 import pytest
 
-from openclaw_skill_deps.graph import (
+from skill_deps_doctor.graph import (
     DepNode,
     build_graph,
     render_dot,
     render_platform_matrix,
     render_tree,
 )
-from openclaw_skill_deps.hints import reset_hint_db
-from openclaw_skill_deps.models import Finding
+from skill_deps_doctor.hints import reset_hint_db
+from skill_deps_doctor.models import Finding
 
 
 @pytest.fixture(autouse=True)
@@ -77,8 +77,8 @@ class TestRenderDot:
 
 
 class TestBuildGraph:
-    @patch("openclaw_skill_deps.graph.probe_bin_version", return_value="20.11.1")
-    @patch("openclaw_skill_deps.graph.which", return_value="/usr/bin/node")
+    @patch("skill_deps_doctor.graph.probe_bin_version", return_value="20.11.1")
+    @patch("skill_deps_doctor.graph.which", return_value="/usr/bin/node")
     def test_basic_graph(self, _wh, _probe, tmp_path):
         skills = tmp_path / "skills"
         skills.mkdir()
@@ -88,7 +88,7 @@ class TestBuildGraph:
         assert roots[0].name == "demo"
         assert any(c.name == "node" for c in roots[0].children)
 
-    @patch("openclaw_skill_deps.graph.which", return_value=None)
+    @patch("skill_deps_doctor.graph.which", return_value=None)
     def test_missing_bin_in_graph(self, _wh, tmp_path):
         skills = tmp_path / "skills"
         skills.mkdir()

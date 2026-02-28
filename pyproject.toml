@@ -1,5 +1,5 @@
 [project]
-name = "openclaw-skill-deps"
+name = "skill-deps-doctor"
 version = "0.1.0"
 description = "Skill-level dependency doctor for OpenClaw"
 requires-python = ">=3.10"
@@ -22,9 +22,9 @@ classifiers = [
 dependencies = ["pyyaml>=6.0"]
 
 [project.urls]
-Homepage = "https://github.com/RangeKing/openclaw-skill-deps"
-Repository = "https://github.com/RangeKing/openclaw-skill-deps"
-Issues = "https://github.com/RangeKing/openclaw-skill-deps/issues"
+Homepage = "https://github.com/RangeKing/skill-deps-doctor"
+Repository = "https://github.com/RangeKing/skill-deps-doctor"
+Issues = "https://github.com/RangeKing/skill-deps-doctor/issues"
 
 [project.optional-dependencies]
 test = [
@@ -32,17 +32,16 @@ test = [
     "pytest-cov>=4.0",
 ]
 dev = [
-    "openclaw-skill-deps[test]",
+    "skill-deps-doctor[test]",
     "mypy>=1.0",
     "types-PyYAML>=6.0",
 ]
 
 [project.scripts]
-openclaw-skill-deps = "openclaw_skill_deps.cli:main"
-skill-deps-doctor = "openclaw_skill_deps.cli:main"
-skill-deps = "openclaw_skill_deps.cli:main"
+skill-deps-doctor = "skill_deps_doctor.cli:main"
+skill-deps = "skill_deps_doctor.cli:main"
 
-[project.entry-points."openclaw_skill_deps.checkers"]
+[project.entry-points."skill_deps_doctor.checkers"]
 # Third-party plugins register here. Example:
 # my_gpu_checker = "my_plugin:check_gpu"
 
@@ -51,7 +50,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.package-data]
-openclaw_skill_deps = ["data/*.yaml"]
+skill_deps_doctor = ["data/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

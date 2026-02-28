@@ -15,7 +15,7 @@ PluginFunc = Callable[[CheckContext], list[Finding]]
 
 def load_plugins() -> list[tuple[str, PluginFunc]]:
     """Discover checker plugins registered via the entry-point group
-    ``openclaw_skill_deps.checkers``.
+    ``skill_deps_doctor.checkers``.
 
     Each entry point must resolve to a callable with signature::
 
@@ -26,7 +26,7 @@ def load_plugins() -> list[tuple[str, PluginFunc]]:
     plugins: list[tuple[str, PluginFunc]] = []
 
     eps = importlib.metadata.entry_points(
-        group="openclaw_skill_deps.checkers",
+        group="skill_deps_doctor.checkers",
     )
 
     for ep in eps:
@@ -111,14 +111,14 @@ def validate_plugins_contract(
 ) -> list[Finding]:
     """Validate plugin entry points and callable contracts without executing plugins."""
     findings: list[Finding] = []
-    eps = importlib.metadata.entry_points(group="openclaw_skill_deps.checkers")
+    eps = importlib.metadata.entry_points(group="skill_deps_doctor.checkers")
 
     if not eps:
         return [
             Finding(
                 kind="plugin_validation_info",
                 item="plugins",
-                detail="No checker plugins registered in entry-point group 'openclaw_skill_deps.checkers'",
+                detail="No checker plugins registered in entry-point group 'skill_deps_doctor.checkers'",
                 severity="info",
                 code="PLUGIN_NONE",
                 confidence="high",

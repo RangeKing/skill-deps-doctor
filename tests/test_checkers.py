@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from openclaw_skill_deps.checkers import (
+from skill_deps_doctor.checkers import (
     check_bins,
     check_fonts,
     check_install_arrays,
@@ -14,7 +14,7 @@ from openclaw_skill_deps.checkers import (
     detect_playwright_runtime_need,
     scan_skills,
 )
-from openclaw_skill_deps.hints import reset_hint_db
+from skill_deps_doctor.hints import reset_hint_db
 
 
 @pytest.fixture(autouse=True)
@@ -65,7 +65,7 @@ class TestScanSkills:
 
 
 class TestCheckBins:
-    @patch("openclaw_skill_deps.checkers.which", return_value=None)
+    @patch("skill_deps_doctor.checkers.which", return_value=None)
     def test_missing_bin(self, _mock_which):
         findings = check_bins(["nonexistent"])
         assert len(findings) == 1
@@ -73,11 +73,11 @@ class TestCheckBins:
         assert findings[0].severity == "error"
         assert findings[0].fix is not None
 
-    @patch("openclaw_skill_deps.checkers.which", return_value="/usr/bin/node")
+    @patch("skill_deps_doctor.checkers.which", return_value="/usr/bin/node")
     def test_present_bin(self, _mock_which):
         assert check_bins(["node"]) == []
 
-    @patch("openclaw_skill_deps.checkers.which", side_effect=lambda n: "/usr/bin/a" if n == "a" else None)
+    @patch("skill_deps_doctor.checkers.which", side_effect=lambda n: "/usr/bin/a" if n == "a" else None)
     def test_partial(self, _mock_which):
         findings = check_bins(["a", "b"])
         assert len(findings) == 1
@@ -85,22 +85,22 @@ class TestCheckBins:
 
 
 class TestCheckFonts:
-    @patch("openclaw_skill_deps.checkers.which", return_value=None)
+    @patch("skill_deps_doctor.checkers.which", return_value=None)
     def test_no_fc_list(self, _mock_which):
         findings = check_fonts()
         assert len(findings) == 1
         assert findings[0].item == "fc-list"
         assert findings[0].severity == "warn"
 
-    @patch("openclaw_skill_deps.checkers.subprocess")
-    @patch("openclaw_skill_deps.checkers.which", return_value="/usr/bin/fc-list")
+    @patch("skill_deps_doctor.checkers.subprocess")
+    @patch("skill_deps_doctor.checkers.which", return_value="/usr/bin/fc-list")
     def test_missing_cjk(self, _mock_which, mock_sp):
         mock_sp.check_output.return_value = "DejaVu Sans\nLiberation Mono\n"
         findings = check_fonts()
         assert any(f.kind == "missing_font" for f in findings)
 
-    @patch("openclaw_skill_deps.checkers.subprocess")
-    @patch("openclaw_skill_deps.checkers.which", return_value="/usr/bin/fc-list")
+    @patch("skill_deps_doctor.checkers.subprocess")
+    @patch("skill_deps_doctor.checkers.which", return_value="/usr/bin/fc-list")
     def test_cjk_present(self, _mock_which, mock_sp):
         mock_sp.check_output.return_value = "Noto Sans CJK SC\nDejaVu Sans\n"
         findings = check_fonts()
@@ -108,8 +108,8 @@ class TestCheckFonts:
         noto_missing = [f for f in font_missing if "Noto" in f.item]
         assert noto_missing == []
 
-    @patch("openclaw_skill_deps.checkers.subprocess")
-    @patch("openclaw_skill_deps.checkers.which", return_value="/usr/bin/fc-list")
+    @patch("skill_deps_doctor.checkers.subprocess")
+    @patch("skill_deps_doctor.checkers.which", return_value="/usr/bin/fc-list")
     def test_probe_failure(self, _mock_which, mock_sp):
         mock_sp.check_output.side_effect = RuntimeError("fc-list failed")
         findings = check_fonts()
@@ -119,7 +119,7 @@ class TestCheckFonts:
 
 
 class TestCheckInstallArrays:
-    @patch("openclaw_skill_deps.checkers.which", return_value=None)
+    @patch("skill_deps_doctor.checkers.which", return_value=None)
     def test_missing_install_bin(self, _mock_which, tmp_path):
         skill_path = tmp_path / "my-skill" / "SKILL.md"
         skill_path.parent.mkdir(parents=True)
@@ -129,7 +129,7 @@ class TestCheckInstallArrays:
         assert len(findings) == 1
         assert findings[0].kind == "missing_install_bin"
 
-    @patch("openclaw_skill_deps.checkers.which", return_value="/usr/bin/x")
+    @patch("skill_deps_doctor.checkers.which", return_value="/usr/bin/x")
     def test_all_present(self, _mock_which, tmp_path):
         skill_path = tmp_path / "my-skill" / "SKILL.md"
         skill_path.parent.mkdir(parents=True)
@@ -162,9 +162,9 @@ class TestCheckPackageDeps:
         assert "npm:express" not in items
         assert "pip:requests" not in items
 
-    @patch("openclaw_skill_deps.hints.which", side_effect=lambda n: "/usr/bin/dnf" if n == "dnf" else None)
-    @patch("openclaw_skill_deps.hints.os_family", return_value="linux")
-    @patch("openclaw_skill_deps.checkers.os_family", return_value="linux")
+    @patch("skill_deps_doctor.hints.which", side_effect=lambda n: "/usr/bin/dnf" if n == "dnf" else None)
+    @patch("skill_deps_doctor.hints.os_family", return_value="linux")
+    @patch("skill_deps_doctor.checkers.os_family", return_value="linux")
     def test_linux_fix_normalized_for_dnf(self, _mock_os_checker, _mock_os_hints, _mock_which):
         findings = check_package_deps([], ["psycopg2"])
         assert len(findings) >= 1
@@ -173,7 +173,7 @@ class TestCheckPackageDeps:
 
 
 class TestCheckProjectPresets:
-    @patch("openclaw_skill_deps.checkers.which", return_value=None)
+    @patch("skill_deps_doctor.checkers.which", return_value=None)
     def test_node_project_missing_bins(self, _mock_which, tmp_path):
         (tmp_path / "package.json").write_text("{}", encoding="utf-8")
         findings = check_project_presets(tmp_path, probe=False)
@@ -181,7 +181,7 @@ class TestCheckProjectPresets:
         assert "node" in items
         assert "npm" in items
 
-    @patch("openclaw_skill_deps.checkers.which", return_value="/usr/bin/python3")
+    @patch("skill_deps_doctor.checkers.which", return_value="/usr/bin/python3")
     def test_python_project_bins_ok(self, _mock_which, tmp_path):
         (tmp_path / "pyproject.toml").write_text("[project]", encoding="utf-8")
         findings = check_project_presets(tmp_path, probe=False)
@@ -192,7 +192,7 @@ class TestCheckProjectPresets:
         findings = check_project_presets(tmp_path, probe=False)
         assert all(f.kind != "missing_bin" for f in findings)
 
-    @patch("openclaw_skill_deps.checkers.which", return_value="/usr/bin/node")
+    @patch("skill_deps_doctor.checkers.which", return_value="/usr/bin/node")
     def test_npm_package_deps_detected(self, _mock_which, tmp_path):
         (tmp_path / "package.json").write_text(
             json.dumps({"dependencies": {"playwright": "^1.0"}}),
@@ -202,7 +202,7 @@ class TestCheckProjectPresets:
         pkg_hints = [f for f in findings if f.kind == "package_dep_hint"]
         assert any("playwright" in f.item for f in pkg_hints)
 
-    @patch("openclaw_skill_deps.checkers.which", return_value="/usr/bin/python3")
+    @patch("skill_deps_doctor.checkers.which", return_value="/usr/bin/python3")
     def test_pip_package_deps_detected(self, _mock_which, tmp_path):
         (tmp_path / "requirements.txt").write_text("opencv-python>=4.0\n", encoding="utf-8")
         findings = check_project_presets(tmp_path, probe=False)
@@ -233,9 +233,9 @@ class TestCheckPlaywrightLibs:
     def test_disabled_returns_empty(self):
         assert check_playwright_libs(enabled=False) == []
 
-    @patch("openclaw_skill_deps.checkers.os_family", return_value="linux")
-    @patch("openclaw_skill_deps.checkers.subprocess")
-    @patch("openclaw_skill_deps.checkers.which", return_value="/sbin/ldconfig")
+    @patch("skill_deps_doctor.checkers.os_family", return_value="linux")
+    @patch("skill_deps_doctor.checkers.subprocess")
+    @patch("skill_deps_doctor.checkers.which", return_value="/sbin/ldconfig")
     def test_enabled_reports_missing_libs(self, _mock_which, mock_sp, _mock_os):
         mock_sp.check_output.return_value = ""
         findings = check_playwright_libs(enabled=True, reason="project:npm:playwright")

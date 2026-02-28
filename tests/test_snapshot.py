@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 
-from openclaw_skill_deps.models import Finding
-from openclaw_skill_deps.snapshot import (
+from skill_deps_doctor.models import Finding
+from skill_deps_doctor.snapshot import (
     build_snapshot,
     find_new_findings,
     load_baseline_findings,

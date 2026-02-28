@@ -1,4 +1,4 @@
-# 🧰 openclaw-skill-deps
+# 🧰 skill-deps-doctor
 
 <div align="center">
 
@@ -6,7 +6,7 @@
 
 Catch missing binaries, system libraries, fonts, and version mismatches *before* a skill fails at runtime.
 
-[![ci](https://github.com/RangeKing/openclaw-skill-deps/actions/workflows/ci.yml/badge.svg)](https://github.com/RangeKing/openclaw-skill-deps/actions/workflows/ci.yml)
+[![ci](https://github.com/RangeKing/skill-deps-doctor/actions/workflows/ci.yml/badge.svg)](https://github.com/RangeKing/skill-deps-doctor/actions/workflows/ci.yml)
 
 **🌐 Languages:** [English](README.md) | [简体中文](README.zh-CN.md)
 
@@ -27,7 +27,7 @@ OpenClaw's built-in `doctor` command checks gateway connectivity, config validit
 | 📦 Missing project-local deps | npm/pip packages that imply system-level deps | No |
 | 🔗 Transitive native deps | `playwright` → Chromium → 13 shared `.so` libs | No |
 
-**skill-deps-doctor** (package: `openclaw-skill-deps`) fills this gap. It is a **deterministic, offline, pre-flight check** that operates at the *skill* layer — complementary to `doctor`, not a replacement.
+**skill-deps-doctor** (package: `skill-deps-doctor`) fills this gap. It is a **deterministic, offline, pre-flight check** that operates at the *skill* layer — complementary to `doctor`, not a replacement.
 
 ### 📋 How it differs from `openclaw doctor`
 
@@ -73,7 +73,7 @@ OpenClaw's built-in `doctor` command checks gateway connectivity, config validit
 - 📁 **Monorepo recursive scan**: `--recursive` discovers nested sub-projects
 
 ### 🔗 Ecosystem integration
-- 🐍 **Programmatic API**: `from openclaw_skill_deps import run_check`
+- 🐍 **Programmatic API**: `from skill_deps_doctor import run_check`
 - 🔌 **Plugin system**: register custom checkers via Python entry points
 - 🪃 **Pre-commit hook**: `.pre-commit-hooks.yaml` included
 - ⚡ **GitHub Action**: `action.yml` with snapshot, baseline, and validation support
@@ -86,17 +86,17 @@ OpenClaw's built-in `doctor` command checks gateway connectivity, config validit
 From PyPI / ClawHub (recommended):
 
 ```bash
-pip install openclaw-skill-deps
+pip install skill-deps-doctor
 ```
 
 Primary CLI command: `skill-deps-doctor` (short alias: `skill-deps`).  
-Legacy command `openclaw-skill-deps` remains available for backward compatibility.
+Legacy command `skill-deps-doctor` remains available for backward compatibility.
 
 For local development:
 
 ```bash
-git clone https://github.com/RangeKing/openclaw-skill-deps.git
-cd openclaw-skill-deps
+git clone https://github.com/RangeKing/skill-deps-doctor.git
+cd skill-deps-doctor
 pip install -e ".[dev]"    # Editable install with pytest + mypy
 ```
 
@@ -180,7 +180,7 @@ skill-deps-doctor --skills-dir ./skills --validate-plugins
 ### 🐍 Programmatic API
 
 ```python
-from openclaw_skill_deps import run_check
+from skill_deps_doctor import run_check
 
 findings = run_check("./skills", check_dir=".", profiles=["slidev"])
 errors = [f for f in findings if f.severity == "error"]
@@ -208,7 +208,7 @@ Each finding (in `--json` output) has:
 ## ⚡ GitHub Action
 
 ```yaml
-- uses: RangeKing/openclaw-skill-deps@v0.1.0
+- uses: RangeKing/skill-deps-doctor@v0.1.0
   with:
     skills-dir: ./skills
     check-dir: .
@@ -223,7 +223,7 @@ Each finding (in `--json` output) has:
 
 ```yaml
 # .pre-commit-config.yaml
-- repo: https://github.com/RangeKing/openclaw-skill-deps
+- repo: https://github.com/RangeKing/skill-deps-doctor
   rev: v0.1.0
   hooks:
     - id: skill-deps-doctor
@@ -236,14 +236,14 @@ Third-party checkers register via entry points:
 
 ```toml
 # pyproject.toml of your plugin package
-[project.entry-points."openclaw_skill_deps.checkers"]
+[project.entry-points."skill_deps_doctor.checkers"]
 gpu_checker = "my_plugin:check_gpu"
 ```
 
 Plugin signature:
 
 ```python
-from openclaw_skill_deps.models import CheckContext, Finding
+from skill_deps_doctor.models import CheckContext, Finding
 
 def check_gpu(ctx: CheckContext) -> list[Finding]:
     ...
@@ -254,7 +254,7 @@ def check_gpu(ctx: CheckContext) -> list[Finding]:
 ## 🏗️ Architecture
 
 ```
-openclaw_skill_deps/
+skill_deps_doctor/
 ├── __init__.py       # Programmatic API (run_check)
 ├── models.py         # Finding, CheckContext
 ├── schemas.py        # Schema version constants + validation

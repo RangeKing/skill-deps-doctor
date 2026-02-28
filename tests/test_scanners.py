@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from openclaw_skill_deps.scanners import (
+from skill_deps_doctor.scanners import (
     ProjectSignals,
     discover_projects,
     parse_dockerfile_installs,

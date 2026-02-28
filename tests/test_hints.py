@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from openclaw_skill_deps.hints import (
+from skill_deps_doctor.hints import (
     HintDB,
     detect_linux_pkg_manager,
     extract_cmd,
@@ -28,22 +28,22 @@ class TestOsFamily:
     def test_returns_known_value(self):
         assert os_family() in {"linux", "macos", "windows", "other"}
 
-    @patch("openclaw_skill_deps.hints.sys")
+    @patch("skill_deps_doctor.hints.sys")
     def test_linux(self, mock_sys):
         mock_sys.platform = "linux"
         assert os_family() == "linux"
 
-    @patch("openclaw_skill_deps.hints.sys")
+    @patch("skill_deps_doctor.hints.sys")
     def test_darwin(self, mock_sys):
         mock_sys.platform = "darwin"
         assert os_family() == "macos"
 
-    @patch("openclaw_skill_deps.hints.sys")
+    @patch("skill_deps_doctor.hints.sys")
     def test_win32(self, mock_sys):
         mock_sys.platform = "win32"
         assert os_family() == "windows"
 
-    @patch("openclaw_skill_deps.hints.sys")
+    @patch("skill_deps_doctor.hints.sys")
     def test_freebsd(self, mock_sys):
         mock_sys.platform = "freebsd"
         assert os_family() == "other"
@@ -75,21 +75,21 @@ class TestHintDB:
         assert fix is not None
         assert "not in hint database" in fix
 
-    @patch("openclaw_skill_deps.hints.os_family", return_value="linux")
+    @patch("skill_deps_doctor.hints.os_family", return_value="linux")
     def test_platform_specific_linux(self, _mock):
         db = HintDB()
         fix = db.fix_for_bin("git")
         assert fix is not None
         assert "install" in fix
 
-    @patch("openclaw_skill_deps.hints.os_family", return_value="macos")
+    @patch("skill_deps_doctor.hints.os_family", return_value="macos")
     def test_platform_specific_macos(self, _mock):
         db = HintDB()
         fix = db.fix_for_bin("ffmpeg")
         assert fix is not None
         assert "brew" in fix
 
-    @patch("openclaw_skill_deps.hints.os_family", return_value="windows")
+    @patch("skill_deps_doctor.hints.os_family", return_value="windows")
     def test_platform_specific_windows(self, _mock):
         db = HintDB()
         fix = db.fix_for_bin("node")
@@ -164,25 +164,25 @@ class TestExtractCmd:
 
 
 class TestLinuxPkgManager:
-    @patch("openclaw_skill_deps.hints._linux_distro_tags", return_value={"fedora"})
-    @patch("openclaw_skill_deps.hints.which", side_effect=lambda n: "/usr/bin/" + n if n in {"apt-get", "dnf"} else None)
-    @patch("openclaw_skill_deps.hints.os_family", return_value="linux")
+    @patch("skill_deps_doctor.hints._linux_distro_tags", return_value={"fedora"})
+    @patch("skill_deps_doctor.hints.which", side_effect=lambda n: "/usr/bin/" + n if n in {"apt-get", "dnf"} else None)
+    @patch("skill_deps_doctor.hints.os_family", return_value="linux")
     def test_prefers_distro_match_over_other_installed(self, _mock_os, _mock_which, _mock_tags):
         assert detect_linux_pkg_manager() == "dnf"
 
-    @patch("openclaw_skill_deps.hints.which", side_effect=lambda n: "/usr/bin/dnf" if n == "dnf" else None)
-    @patch("openclaw_skill_deps.hints.os_family", return_value="linux")
+    @patch("skill_deps_doctor.hints.which", side_effect=lambda n: "/usr/bin/dnf" if n == "dnf" else None)
+    @patch("skill_deps_doctor.hints.os_family", return_value="linux")
     def test_detect_dnf(self, _mock_os, _mock_which):
         assert detect_linux_pkg_manager() == "dnf"
 
-    @patch("openclaw_skill_deps.hints.which", side_effect=lambda n: "/usr/bin/apk" if n == "apk" else None)
-    @patch("openclaw_skill_deps.hints.os_family", return_value="linux")
+    @patch("skill_deps_doctor.hints.which", side_effect=lambda n: "/usr/bin/apk" if n == "apk" else None)
+    @patch("skill_deps_doctor.hints.os_family", return_value="linux")
     def test_normalize_apk(self, _mock_os, _mock_which):
         cmd = normalize_fix_command("sudo apt-get install -y libpq-dev build-essential")
         assert cmd == "sudo apk add --no-cache libpq-dev build-essential"
 
-    @patch("openclaw_skill_deps.hints.which", side_effect=lambda n: "/usr/bin/pacman" if n == "pacman" else None)
-    @patch("openclaw_skill_deps.hints.os_family", return_value="linux")
+    @patch("skill_deps_doctor.hints.which", side_effect=lambda n: "/usr/bin/pacman" if n == "pacman" else None)
+    @patch("skill_deps_doctor.hints.os_family", return_value="linux")
     def test_normalize_pacman(self, _mock_os, _mock_which):
         cmd = normalize_fix_command("sudo apt-get install -y ffmpeg")
         assert cmd == "sudo pacman -S --needed --noconfirm ffmpeg"

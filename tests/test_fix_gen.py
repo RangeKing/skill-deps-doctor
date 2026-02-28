@@ -1,22 +1,22 @@
 from unittest.mock import patch
 
-from openclaw_skill_deps.fix_gen import generate_fix_script
-from openclaw_skill_deps.models import Finding
+from skill_deps_doctor.fix_gen import generate_fix_script
+from skill_deps_doctor.models import Finding
 
 
 class TestGenerateFixScript:
-    @patch("openclaw_skill_deps.fix_gen.os_family", return_value="linux")
+    @patch("skill_deps_doctor.fix_gen.os_family", return_value="linux")
     def test_bash_header(self, _mock):
         script = generate_fix_script([])
         assert script.startswith("#!/usr/bin/env bash")
         assert "set -euo pipefail" in script
 
-    @patch("openclaw_skill_deps.fix_gen.os_family", return_value="windows")
+    @patch("skill_deps_doctor.fix_gen.os_family", return_value="windows")
     def test_powershell_header(self, _mock):
         script = generate_fix_script([])
         assert "PowerShell" in script
 
-    @patch("openclaw_skill_deps.fix_gen.os_family", return_value="linux")
+    @patch("skill_deps_doctor.fix_gen.os_family", return_value="linux")
     def test_includes_runnable_commands(self, _mock):
         findings = [
             Finding(
@@ -29,7 +29,7 @@ class TestGenerateFixScript:
         script = generate_fix_script(findings)
         assert "sudo apt-get install -y git" in script
 
-    @patch("openclaw_skill_deps.fix_gen.os_family", return_value="linux")
+    @patch("skill_deps_doctor.fix_gen.os_family", return_value="linux")
     def test_manual_steps_as_comments(self, _mock):
         findings = [
             Finding(
@@ -43,7 +43,7 @@ class TestGenerateFixScript:
         assert "# (manual)" in script
         assert "Install Docker Desktop" in script
 
-    @patch("openclaw_skill_deps.fix_gen.os_family", return_value="linux")
+    @patch("skill_deps_doctor.fix_gen.os_family", return_value="linux")
     def test_skips_info_findings(self, _mock):
         findings = [
             Finding(kind="info_thing", item="ok", detail="all good", severity="info"),
@@ -53,7 +53,7 @@ class TestGenerateFixScript:
         assert "info_thing" not in script
         assert "sudo apt-get install -y git" in script
 
-    @patch("openclaw_skill_deps.fix_gen.os_family", return_value="linux")
+    @patch("skill_deps_doctor.fix_gen.os_family", return_value="linux")
     def test_no_fix_no_crash(self, _mock):
         findings = [
             Finding(kind="missing_bin", item="x", detail="x", fix=None),
@@ -61,7 +61,7 @@ class TestGenerateFixScript:
         script = generate_fix_script(findings)
         assert "No automated fixes" in script
 
-    @patch("openclaw_skill_deps.fix_gen.os_family", return_value="windows")
+    @patch("skill_deps_doctor.fix_gen.os_family", return_value="windows")
     def test_linux_cmds_commented_on_windows(self, _mock):
         findings = [
             Finding(kind="missing_bin", item="git", detail="x", fix="sudo apt-get install -y git"),

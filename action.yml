@@ -1,4 +1,4 @@
-name: "OpenClaw Skill Deps Doctor"
+name: "Skill Deps Doctor"
 description: "Preflight check for missing skill dependencies (binaries, libs, fonts)"
 branding:
   icon: "check-circle"
@@ -65,7 +65,7 @@ runs:
       with:
         python-version: ${{ inputs.python-version }}
 
-    - name: Install openclaw-skill-deps
+    - name: Install skill-deps-doctor
       shell: bash
       run: pip install "${{ github.action_path }}"
 

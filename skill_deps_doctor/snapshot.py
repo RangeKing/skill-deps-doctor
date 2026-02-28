@@ -45,7 +45,7 @@ def build_snapshot(
         "schema_version": SCHEMA_VERSION,
         "created_at_utc": _now_utc(),
         "tool": {
-            "name": "openclaw-skill-deps",
+            "name": "skill-deps-doctor",
         },
         "environment": {
             "os_family": os_family(),

@@ -15,20 +15,20 @@ step() {
   "$@"
 }
 
-echo "OpenClaw Skill Deps release precheck"
+echo "Skill Deps Doctor release precheck"
 echo "Workspace: $(pwd)"
 
-step "Validate hints schema" python -m openclaw_skill_deps.cli --skills-dir clawhub-skill --validate-hints
-step "Validate plugin contracts" python -m openclaw_skill_deps.cli --skills-dir clawhub-skill --validate-plugins
-step "Verify hints migration clean" python scripts/migrate_hints_schema.py --in openclaw_skill_deps/data/hints.yaml --check
-step "Check skill wrapper help" python clawhub-skill/openclaw-skill-deps/scripts/openclaw-skill-deps.py --help
+step "Validate hints schema" python -m skill_deps_doctor.cli --skills-dir clawhub-skill --validate-hints
+step "Validate plugin contracts" python -m skill_deps_doctor.cli --skills-dir clawhub-skill --validate-plugins
+step "Verify hints migration clean" python scripts/migrate_hints_schema.py --in skill_deps_doctor/data/hints.yaml --check
+step "Check skill wrapper help" python clawhub-skill/skill-deps-doctor/scripts/skill-deps-doctor.py --help
 
 if [[ "${FULL}" -eq 1 ]]; then
   step "Run unit tests" python -m pytest -q -p no:cacheprovider
-  step "Run mypy" python -m mypy openclaw_skill_deps/
+  step "Run mypy" python -m mypy skill_deps_doctor/
 fi
 
 echo
 echo "Precheck finished successfully."
 echo "Suggested publish command:"
-echo "  clawhub publish --skill clawhub-skill/openclaw-skill-deps --slug openclaw-skill-deps --version <x.y.z> --verbose"
+echo "  clawhub publish --skill clawhub-skill/skill-deps-doctor --slug skill-deps-doctor --version <x.y.z> --verbose"

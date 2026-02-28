@@ -2,8 +2,8 @@ from unittest.mock import patch
 
 import pytest
 
-from openclaw_skill_deps.hints import reset_hint_db
-from openclaw_skill_deps.profiles import check_profile, list_profiles
+from skill_deps_doctor.hints import reset_hint_db
+from skill_deps_doctor.profiles import check_profile, list_profiles
 
 
 @pytest.fixture(autouse=True)
@@ -33,7 +33,7 @@ class TestCheckProfile:
         assert findings[0].kind == "unknown_profile"
         assert "Available" in findings[0].detail
 
-    @patch("openclaw_skill_deps.profiles.which", return_value=None)
+    @patch("skill_deps_doctor.profiles.which", return_value=None)
     def test_missing_bins(self, _mock_which):
         findings = check_profile("slidev")
         missing = [f for f in findings if f.kind == "missing_bin"]
@@ -41,7 +41,7 @@ class TestCheckProfile:
         assert "node" in items
         assert "npm" in items
 
-    @patch("openclaw_skill_deps.profiles.which", return_value="/usr/bin/node")
+    @patch("skill_deps_doctor.profiles.which", return_value="/usr/bin/node")
     def test_bins_present(self, _mock_which):
         findings = check_profile("slidev")
         missing = [f for f in findings if f.kind == "missing_bin"]
@@ -53,7 +53,7 @@ class TestCheckProfile:
         assert len(font_findings) > 0
         assert font_findings[0].severity == "warn"
 
-    @patch("openclaw_skill_deps.profiles.which", return_value=None)
+    @patch("skill_deps_doctor.profiles.which", return_value=None)
     def test_whisper_profile(self, _mock_which):
         findings = check_profile("whisper")
         items = {f.item for f in findings if f.kind == "missing_bin"}

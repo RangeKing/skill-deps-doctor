@@ -1,10 +1,10 @@
 ---
-name: OpenClaw Skill Deps Doctor
-description: "Skill-level dependency doctor for OpenClaw — preflight check for missing binaries, version mismatches, system libraries, CJK fonts, Playwright/Chromium runtime, and project-level deps. Complementary to `openclaw doctor`: it checks skill runtime deps that `doctor` cannot reach."
-metadata: {"clawdbot": {"emoji": "🧰", "requires": {"bins": ["python3", "skill-deps-doctor"]}, "install": [{"id": "skill-deps-doctor", "kind": "pip", "package": "openclaw-skill-deps", "bins": ["skill-deps-doctor"], "label": "Install skill-deps-doctor (package: openclaw-skill-deps) from PyPI"}]}}
+name: Skill Deps Doctor
+description: "Cross-platform skill dependency doctor — preflight check for missing binaries, version mismatches, system libraries, CJK fonts, Playwright/Chromium runtime, and project-level deps. Use before running skills to prevent late runtime dependency failures."
+metadata: {"clawdbot": {"emoji": "🧰", "requires": {"bins": ["python3", "skill-deps-doctor"]}, "install": [{"id": "skill-deps-doctor", "kind": "pip", "package": "skill-deps-doctor", "bins": ["skill-deps-doctor"], "label": "Install skill-deps-doctor (package: skill-deps-doctor) from PyPI"}]}}
 ---
 
-# 🧰 OpenClaw Skill Deps Doctor
+# 🧰 Skill Deps Doctor
 
 > **Complementary to `openclaw doctor`** — `doctor` checks gateway/config/services;
 > this skill checks **skill runtime dependencies** (bins, versions, libs, fonts).
@@ -28,10 +28,10 @@ Use this skill to **detect missing or broken dependencies before a skill fails a
 ## Install
 
 ```bash
-pip install openclaw-skill-deps
+pip install skill-deps-doctor
 ```
 
-Legacy command `openclaw-skill-deps` remains supported for compatibility.
+Legacy command `skill-deps-doctor` remains supported for compatibility.
 
 ## Usage
 
@@ -120,7 +120,7 @@ skill-deps-doctor --skills-dir ./skills --no-plugins  # Skip third-party plugins
 ### Fallback wrapper (repo/dev layout)
 
 ```bash
-python {baseDir}/scripts/openclaw-skill-deps.py --skills-dir ./skills
+python {baseDir}/scripts/skill-deps-doctor.py --skills-dir ./skills
 ```
 
 ## Notes

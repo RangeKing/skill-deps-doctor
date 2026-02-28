@@ -23,7 +23,7 @@ def run_check(
 
     Example::
 
-        from openclaw_skill_deps import run_check
+        from skill_deps_doctor import run_check
 
         findings = run_check("./skills", check_dir=".", profiles=["slidev"])
         errors = [f for f in findings if f.severity == "error"]

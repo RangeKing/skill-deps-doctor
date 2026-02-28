@@ -24,7 +24,7 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Lint (mypy)
-        run: mypy openclaw_skill_deps/
+        run: mypy skill_deps_doctor/
 
       - name: Test
         run: pytest -v --tb=short
@@ -57,4 +57,4 @@ jobs:
         run: skill-deps-doctor --skills-dir . --validate-plugins
 
       - name: Verify hints migration is clean
-        run: python scripts/migrate_hints_schema.py --in openclaw_skill_deps/data/hints.yaml --check
+        run: python scripts/migrate_hints_schema.py --in skill_deps_doctor/data/hints.yaml --check

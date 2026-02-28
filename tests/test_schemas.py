@@ -1,4 +1,4 @@
-from openclaw_skill_deps.schemas import HINTS_SCHEMA_VERSION, validate_hints_data
+from skill_deps_doctor.schemas import HINTS_SCHEMA_VERSION, validate_hints_data
 
 
 class TestValidateHintsData:

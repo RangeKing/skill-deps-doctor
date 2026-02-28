@@ -1,4 +1,4 @@
-from openclaw_skill_deps.migration import migrate_hints_to_v1, migration_needed
+from skill_deps_doctor.migration import migrate_hints_to_v1, migration_needed
 
 
 class TestMigrateHintsToV1:

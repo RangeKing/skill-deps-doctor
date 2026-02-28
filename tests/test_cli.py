@@ -4,8 +4,8 @@ from unittest.mock import patch
 
 import pytest
 
-from openclaw_skill_deps.cli import main
-from openclaw_skill_deps.hints import reset_hint_db
+from skill_deps_doctor.cli import main
+from skill_deps_doctor.hints import reset_hint_db
 
 
 @pytest.fixture(autouse=True)
@@ -36,8 +36,8 @@ metadata:
 
 
 class TestMainExitCodes:
-    @patch("openclaw_skill_deps.checkers.which", return_value="/usr/bin/x")
-    @patch("openclaw_skill_deps.checkers.subprocess")
+    @patch("skill_deps_doctor.checkers.which", return_value="/usr/bin/x")
+    @patch("skill_deps_doctor.checkers.subprocess")
     def test_pass_returns_0(self, _mock_sp, _mock_which, tmp_path, capsys):
         _mock_sp.check_output.return_value = "Noto Sans CJK SC\nWenQuanYi Zen Hei"
         skills = tmp_path / "skills"
@@ -50,7 +50,7 @@ class TestMainExitCodes:
         assert rc == 0
         assert "PASS" in capsys.readouterr().out
 
-    @patch("openclaw_skill_deps.checkers.which", return_value=None)
+    @patch("skill_deps_doctor.checkers.which", return_value=None)
     def test_fail_returns_2(self, _mock_which, tmp_path, capsys):
         skills = tmp_path / "skills"
         skills.mkdir()
@@ -64,7 +64,7 @@ class TestMainExitCodes:
 
 
 class TestJsonOutput:
-    @patch("openclaw_skill_deps.checkers.which", return_value=None)
+    @patch("skill_deps_doctor.checkers.which", return_value=None)
     def test_json_has_severity(self, _mock_which, tmp_path, capsys):
         skills = tmp_path / "skills"
         skills.mkdir()
@@ -80,8 +80,8 @@ class TestJsonOutput:
 
 
 class TestInfoOnlyNoFail:
-    @patch("openclaw_skill_deps.checkers.which", return_value="/usr/bin/fc-list")
-    @patch("openclaw_skill_deps.checkers.subprocess")
+    @patch("skill_deps_doctor.checkers.which", return_value="/usr/bin/fc-list")
+    @patch("skill_deps_doctor.checkers.subprocess")
     def test_info_findings_exit_0(self, mock_sp, _mock_which, tmp_path, capsys):
         mock_sp.check_output.return_value = "Noto Sans CJK SC\nWenQuanYi"
         skills = tmp_path / "skills"
@@ -94,7 +94,7 @@ class TestInfoOnlyNoFail:
 
 
 class TestVerboseQuiet:
-    @patch("openclaw_skill_deps.checkers.which", return_value=None)
+    @patch("skill_deps_doctor.checkers.which", return_value=None)
     def test_quiet_shows_only_errors(self, _mock_which, tmp_path, capsys):
         skills = tmp_path / "skills"
         skills.mkdir()
@@ -107,7 +107,7 @@ class TestVerboseQuiet:
         assert "[ERR]" in out
         assert "[WARN]" not in out
 
-    @patch("openclaw_skill_deps.checkers.which", return_value=None)
+    @patch("skill_deps_doctor.checkers.which", return_value=None)
     def test_verbose_shows_os(self, _mock_which, tmp_path, capsys):
         skills = tmp_path / "skills"
         skills.mkdir()
@@ -134,7 +134,7 @@ class TestListProfiles:
 
 
 class TestFixMode:
-    @patch("openclaw_skill_deps.checkers.which", return_value=None)
+    @patch("skill_deps_doctor.checkers.which", return_value=None)
     def test_fix_outputs_script(self, _mock_which, tmp_path, capsys):
         skills = tmp_path / "skills"
         skills.mkdir()
@@ -148,8 +148,8 @@ class TestFixMode:
 
 
 class TestProfileFlag:
-    @patch("openclaw_skill_deps.profiles.which", return_value=None)
-    @patch("openclaw_skill_deps.checkers.which", return_value=None)
+    @patch("skill_deps_doctor.profiles.which", return_value=None)
+    @patch("skill_deps_doctor.checkers.which", return_value=None)
     def test_profile_findings_included(self, _mock_which1, _mock_which2, tmp_path, capsys):
         skills = tmp_path / "skills"
         skills.mkdir()
@@ -163,7 +163,7 @@ class TestProfileFlag:
 
 
 class TestHintsFile:
-    @patch("openclaw_skill_deps.checkers.which", return_value=None)
+    @patch("skill_deps_doctor.checkers.which", return_value=None)
     def test_custom_hints(self, _mock_which, tmp_path, capsys):
         skills = tmp_path / "skills"
         skills.mkdir()
@@ -185,8 +185,8 @@ class TestHintsFile:
 
 
 class TestRecursiveFlag:
-    @patch("openclaw_skill_deps.checkers.subprocess")
-    @patch("openclaw_skill_deps.checkers.which", return_value="/usr/bin/node")
+    @patch("skill_deps_doctor.checkers.subprocess")
+    @patch("skill_deps_doctor.checkers.which", return_value="/usr/bin/node")
     def test_recursive_finds_subprojects(self, _mock_which, mock_sp, tmp_path, capsys):
         mock_sp.check_output.return_value = "Noto Sans CJK SC\nWenQuanYi Zen Hei"
         skills = tmp_path / "skills"
@@ -222,8 +222,8 @@ class TestNoPlugins:
 
 
 class TestGraphFlag:
-    @patch("openclaw_skill_deps.graph.probe_bin_version", return_value="20.11.1")
-    @patch("openclaw_skill_deps.graph.which", return_value="/usr/bin/node")
+    @patch("skill_deps_doctor.graph.probe_bin_version", return_value="20.11.1")
+    @patch("skill_deps_doctor.graph.which", return_value="/usr/bin/node")
     def test_tree_output(self, _wh, _probe, tmp_path, capsys):
         skills = tmp_path / "skills"
         skills.mkdir()
@@ -237,8 +237,8 @@ class TestGraphFlag:
         assert "demo" in out
         assert "node" in out
 
-    @patch("openclaw_skill_deps.graph.probe_bin_version", return_value="20.11.1")
-    @patch("openclaw_skill_deps.graph.which", return_value="/usr/bin/node")
+    @patch("skill_deps_doctor.graph.probe_bin_version", return_value="20.11.1")
+    @patch("skill_deps_doctor.graph.which", return_value="/usr/bin/node")
     def test_dot_output(self, _wh, _probe, tmp_path, capsys):
         skills = tmp_path / "skills"
         skills.mkdir()
@@ -253,7 +253,7 @@ class TestGraphFlag:
 
 
 class TestPlatformMatrix:
-    @patch("openclaw_skill_deps.checkers.which", return_value=None)
+    @patch("skill_deps_doctor.checkers.which", return_value=None)
     def test_matrix_output(self, _mock_which, tmp_path, capsys):
         skills = tmp_path / "skills"
         skills.mkdir()
@@ -271,7 +271,7 @@ class TestPlatformMatrix:
 
 
 class TestSnapshotAndBaseline:
-    @patch("openclaw_skill_deps.checkers.which", return_value=None)
+    @patch("skill_deps_doctor.checkers.which", return_value=None)
     def test_snapshot_file_written(self, _mock_which, tmp_path, capsys):
         skills = tmp_path / "skills"
         skills.mkdir()
@@ -289,7 +289,7 @@ class TestSnapshotAndBaseline:
         assert "findings" in payload
         _ = capsys.readouterr()
 
-    @patch("openclaw_skill_deps.checkers.which", return_value=None)
+    @patch("skill_deps_doctor.checkers.which", return_value=None)
     def test_fail_on_new_uses_exit_3(self, _mock_which, tmp_path, capsys):
         skills = tmp_path / "skills"
         skills.mkdir()
@@ -306,8 +306,8 @@ class TestSnapshotAndBaseline:
         assert rc == 3
         _ = capsys.readouterr()
 
-    @patch("openclaw_skill_deps.checkers.which", return_value="/usr/bin/fc-list")
-    @patch("openclaw_skill_deps.checkers.subprocess")
+    @patch("skill_deps_doctor.checkers.which", return_value="/usr/bin/fc-list")
+    @patch("skill_deps_doctor.checkers.subprocess")
     def test_invalid_baseline_becomes_error(self, mock_sp, _mock_which, tmp_path, capsys):
         mock_sp.check_output.return_value = "Noto Sans CJK SC\nWenQuanYi Zen Hei"
         skills = tmp_path / "skills"
@@ -359,7 +359,7 @@ class TestValidateHintsFlag:
 
 
 class TestValidatePluginsFlag:
-    @patch("openclaw_skill_deps.cli.validate_plugins_contract")
+    @patch("skill_deps_doctor.cli.validate_plugins_contract")
     def test_validate_plugins_ok(self, mock_validate, tmp_path, capsys):
         skills = tmp_path / "skills"
         skills.mkdir()
@@ -372,11 +372,11 @@ class TestValidatePluginsFlag:
         out = capsys.readouterr().out
         assert "VALIDATION OK" in out
 
-    @patch("openclaw_skill_deps.cli.validate_plugins_contract")
+    @patch("skill_deps_doctor.cli.validate_plugins_contract")
     def test_validate_plugins_fail(self, mock_validate, tmp_path, capsys):
         skills = tmp_path / "skills"
         skills.mkdir()
-        from openclaw_skill_deps.models import Finding
+        from skill_deps_doctor.models import Finding
 
         mock_validate.return_value = [
             Finding(

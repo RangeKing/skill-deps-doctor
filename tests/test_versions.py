@@ -2,8 +2,8 @@ from unittest.mock import patch
 
 import pytest
 
-from openclaw_skill_deps.hints import reset_hint_db
-from openclaw_skill_deps.versions import (
+from skill_deps_doctor.hints import reset_hint_db
+from skill_deps_doctor.versions import (
     VersionReq,
     check_bin_versions,
     compare_versions,
@@ -86,16 +86,16 @@ class TestCompareVersions:
 
 
 class TestProbeBinVersion:
-    @patch("openclaw_skill_deps.versions.which", return_value="/usr/bin/node")
-    @patch("openclaw_skill_deps.versions.subprocess")
+    @patch("skill_deps_doctor.versions.which", return_value="/usr/bin/node")
+    @patch("skill_deps_doctor.versions.subprocess")
     def test_with_version_command(self, mock_sp, _wh):
         mock_sp.check_output.return_value = "v20.11.1\n"
         mock_sp.STDOUT = -2
         v = probe_bin_version("node")
         assert v == "20.11.1"
 
-    @patch("openclaw_skill_deps.versions.which", return_value="/usr/bin/unknown_tool")
-    @patch("openclaw_skill_deps.versions.subprocess")
+    @patch("skill_deps_doctor.versions.which", return_value="/usr/bin/unknown_tool")
+    @patch("skill_deps_doctor.versions.subprocess")
     def test_generic_fallback(self, mock_sp, _wh):
         mock_sp.check_output.return_value = "unknown_tool version 1.2.3"
         mock_sp.STDOUT = -2
@@ -104,23 +104,23 @@ class TestProbeBinVersion:
 
 
 class TestCheckBinVersions:
-    @patch("openclaw_skill_deps.versions.probe_bin_version", return_value="20.11.1")
-    @patch("openclaw_skill_deps.versions.which", return_value="/usr/bin/node")
+    @patch("skill_deps_doctor.versions.probe_bin_version", return_value="20.11.1")
+    @patch("skill_deps_doctor.versions.which", return_value="/usr/bin/node")
     def test_version_ok(self, _wh, _probe):
         findings = check_bin_versions(["node>=18"])
         assert len(findings) == 1
         assert findings[0].kind == "version_ok"
         assert findings[0].severity == "info"
 
-    @patch("openclaw_skill_deps.versions.probe_bin_version", return_value="16.3.0")
-    @patch("openclaw_skill_deps.versions.which", return_value="/usr/bin/node")
+    @patch("skill_deps_doctor.versions.probe_bin_version", return_value="16.3.0")
+    @patch("skill_deps_doctor.versions.which", return_value="/usr/bin/node")
     def test_version_mismatch(self, _wh, _probe):
         findings = check_bin_versions(["node>=18"])
         assert len(findings) == 1
         assert findings[0].kind == "version_mismatch"
         assert findings[0].severity == "error"
 
-    @patch("openclaw_skill_deps.versions.which", return_value=None)
+    @patch("skill_deps_doctor.versions.which", return_value=None)
     def test_missing_bin_skipped(self, _wh):
         findings = check_bin_versions(["node>=18"])
         assert findings == []
@@ -129,8 +129,8 @@ class TestCheckBinVersions:
         findings = check_bin_versions(["node"])
         assert findings == []
 
-    @patch("openclaw_skill_deps.versions.probe_bin_version", return_value=None)
-    @patch("openclaw_skill_deps.versions.which", return_value="/usr/bin/node")
+    @patch("skill_deps_doctor.versions.probe_bin_version", return_value=None)
+    @patch("skill_deps_doctor.versions.which", return_value="/usr/bin/node")
     def test_version_unknown(self, _wh, _probe):
         findings = check_bin_versions(["node>=18"])
         assert len(findings) == 1

@@ -3,8 +3,8 @@ from unittest.mock import patch
 
 import pytest
 
-from openclaw_skill_deps import run_check
-from openclaw_skill_deps.hints import reset_hint_db
+from skill_deps_doctor import run_check
+from skill_deps_doctor.hints import reset_hint_db
 
 
 @pytest.fixture(autouse=True)
@@ -35,9 +35,9 @@ metadata:
 
 
 class TestRunCheck:
-    @patch("openclaw_skill_deps.versions.which", return_value="/usr/bin/x")
-    @patch("openclaw_skill_deps.checkers.which", return_value="/usr/bin/x")
-    @patch("openclaw_skill_deps.checkers.subprocess")
+    @patch("skill_deps_doctor.versions.which", return_value="/usr/bin/x")
+    @patch("skill_deps_doctor.checkers.which", return_value="/usr/bin/x")
+    @patch("skill_deps_doctor.checkers.subprocess")
     def test_all_pass(self, mock_sp, _mock_which, _mock_ver_which, tmp_path):
         mock_sp.check_output.return_value = "Noto Sans CJK SC\nWenQuanYi Zen Hei"
         skills = tmp_path / "skills"
@@ -48,8 +48,8 @@ class TestRunCheck:
         errors = [f for f in findings if f.severity == "error"]
         assert errors == []
 
-    @patch("openclaw_skill_deps.versions.which", return_value=None)
-    @patch("openclaw_skill_deps.checkers.which", return_value=None)
+    @patch("skill_deps_doctor.versions.which", return_value=None)
+    @patch("skill_deps_doctor.checkers.which", return_value=None)
     def test_missing_bins_detected(self, _mock_which, _mock_ver_which, tmp_path):
         skills = tmp_path / "skills"
         skills.mkdir()
@@ -59,8 +59,8 @@ class TestRunCheck:
         errors = [f for f in findings if f.severity == "error"]
         assert any(f.item == "missing_tool" for f in errors)
 
-    @patch("openclaw_skill_deps.profiles.which", return_value=None)
-    @patch("openclaw_skill_deps.checkers.which", return_value=None)
+    @patch("skill_deps_doctor.profiles.which", return_value=None)
+    @patch("skill_deps_doctor.checkers.which", return_value=None)
     def test_with_profile(self, _mock1, _mock2, tmp_path):
         skills = tmp_path / "skills"
         skills.mkdir()
@@ -75,8 +75,8 @@ class TestRunCheck:
         result = run_check(skills, use_plugins=False)
         assert isinstance(result, list)
 
-    @patch("openclaw_skill_deps.checkers.subprocess")
-    @patch("openclaw_skill_deps.checkers.which", return_value="/usr/bin/node")
+    @patch("skill_deps_doctor.checkers.subprocess")
+    @patch("skill_deps_doctor.checkers.which", return_value="/usr/bin/node")
     def test_check_dir(self, _mock_which, mock_sp, tmp_path):
         mock_sp.check_output.return_value = "Noto Sans CJK SC\nWenQuanYi Zen Hei"
         skills = tmp_path / "skills"
@@ -89,8 +89,8 @@ class TestRunCheck:
         pkg_hints = [f for f in findings if f.kind == "package_dep_hint"]
         assert any("playwright" in f.item for f in pkg_hints)
 
-    @patch("openclaw_skill_deps.checkers.subprocess")
-    @patch("openclaw_skill_deps.checkers.which", return_value="/usr/bin/node")
+    @patch("skill_deps_doctor.checkers.subprocess")
+    @patch("skill_deps_doctor.checkers.which", return_value="/usr/bin/node")
     def test_recursive(self, _mock_which, mock_sp, tmp_path):
         mock_sp.check_output.return_value = "Noto Sans CJK SC\nWenQuanYi Zen Hei"
         skills = tmp_path / "skills"
